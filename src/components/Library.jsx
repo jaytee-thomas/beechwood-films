@@ -1,22 +1,44 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import useLibraryStore from "../store/useLibraryStore";
 import AdminBar from "./AdminBar";
 import AddVideoModal from "./AddVideoModal";
+import AdminUnlockModal from "./AdminUnlockModal";
+import ConfirmModal from "./ConfirmModal";
+import ChangePinModal from "./ChangePinModal";
+import ForgotPinModal from "./ForgotPinModal";
 
-const ADMIN_PIN = "2468";
+const DEFAULT_ADMIN_PIN = "2468";
 const ADMIN_KEY = "bf_admin_unlocked";
+const ADMIN_PIN_KEY = "bf_admin_pin";
+const MASTER_CODE =
+  import.meta?.env?.VITE_MASTER_CODE || "BEECHWOOD-RESET-2468";
 
 export default function Library() {
+  // Store
   const videos = useLibraryStore((s) => s.videos);
+  const progress = useLibraryStore((s) => s.progress);
+  const setProgress = useLibraryStore((s) => s.setProgress);
+  const clearProgress = useLibraryStore((s) => s.clearProgress);
   const toggleFavorite = useLibraryStore((s) => s.toggleFavorite);
 
+  // UI state
   const [search, setSearch] = useState("");
-  const [view, setView] = useState("library"); // library | favorites
+  const [view, setView] = useState("library"); // "library" | "favorites"
   const [playing, setPlaying] = useState(null);
 
+  // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
+  const [showChangePin, setShowChangePin] = useState(false);
+  const [showForgotPin, setShowForgotPin] = useState(false);
 
+  // Refs
+  const lastSavedSecondRef = useRef(-1);
+  const videoRef = useRef(null);
+
+  // Bootstrap admin unlocked flag
   useEffect(() => {
     try {
       const saved = localStorage.getItem(ADMIN_KEY);
@@ -25,164 +47,313 @@ export default function Library() {
   }, []);
 
   const list = Array.isArray(videos) ? videos : [];
+
+  // --- Admin PIN helpers ---
+  function getEffectivePin() {
+    try {
+      return localStorage.getItem(ADMIN_PIN_KEY) || DEFAULT_ADMIN_PIN;
+    } catch {
+      return DEFAULT_ADMIN_PIN;
+    }
+  }
+  function setEffectivePin(newPin) {
+    try {
+      localStorage.setItem(ADMIN_PIN_KEY, newPin);
+    } catch {}
+  }
+
+  // --- Continue Watching (ordered by last updated) ---
+  const continueList = useMemo(() => {
+    return list
+      .map((v) => ({ v, p: progress?.[v.id] }))
+      .filter((x) => x.p && x.p.t > 0)
+      .sort((a, b) => (b.p.updatedAt || 0) - (a.p.updatedAt || 0))
+      .map((x) => x.v);
+  }, [list, progress]);
+
+  // --- Filter by view + search ---
   const filtered = useMemo(() => {
     const base = view === "favorites" ? list.filter((v) => v.favorite) : list;
-    return base.filter((v) =>
-      (v.title || "").toLowerCase().includes(search.toLowerCase())
-    );
+    const q = search.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((v) => (v.title || "").toLowerCase().includes(q));
   }, [list, view, search]);
 
-  function handleUnlock() {
-    const input = window.prompt("Enter Admin PIN:");
-    if (input === ADMIN_PIN) {
+  // --- Admin flows ---
+  function requestUnlock() {
+    setShowUnlock(true);
+  }
+  async function verifyPinAndUnlock(pin) {
+    const ok = pin === getEffectivePin();
+    if (ok) {
       setIsAdmin(true);
       try {
         localStorage.setItem(ADMIN_KEY, "1");
       } catch {}
-    } else if (input !== null) {
-      alert("Incorrect PIN.");
     }
+    return ok;
   }
-
-  function handleLock() {
+  function requestLock() {
+    setShowLockConfirm(true);
+  }
+  function doLock() {
     setIsAdmin(false);
     try {
       localStorage.removeItem(ADMIN_KEY);
     } catch {}
+    setShowLockConfirm(false);
+  }
+  function requestChangePin() {
+    setShowChangePin(true);
+  }
+  function applyChangePin(newPin) {
+    setEffectivePin(newPin);
+  }
+  function requestForgotPin() {
+    setShowForgotPin(true);
+  }
+  function resetPinFromMaster(newPin) {
+    setEffectivePin(newPin);
+    setIsAdmin(true);
+    try {
+      localStorage.setItem(ADMIN_KEY, "1");
+    } catch {}
+  }
+
+  // --- Player handlers ---
+  function handleLoadedMetadata(e) {
+    const el = e.currentTarget;
+    if (!playing || !el) return;
+    const saved = progress?.[playing.id]?.t || 0;
+    if (saved > 0 && Number.isFinite(saved)) {
+      try {
+        el.currentTime = saved;
+      } catch {}
+    }
+  }
+  function handleTimeUpdate(e) {
+    const el = e.currentTarget;
+    if (!playing || !el) return;
+    const s = Math.floor(el.currentTime || 0);
+    // Save every 5 seconds
+    if (s >= 0 && s !== lastSavedSecondRef.current && s % 5 === 0) {
+      lastSavedSecondRef.current = s;
+      setProgress(playing.id, s);
+    }
+  }
+  function handleEnded() {
+    if (playing) clearProgress(playing.id);
+  }
+
+  function resumeVideo(v) {
+    setPlaying(v);
   }
 
   return (
-    <div style={styles.page}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.logo}>🎬 Beechwood Films</div>
+    <div className='bf-page'>
+      <div className='bf-container'>
+        {/* HEADER (YouTube-lite: logo | centered search | right actions) */}
+        <header className='bf-header'>
+          <div className='bf-logo'>🎬 Beechwood Films</div>
 
-        <div style={styles.searchWrap}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder='Search your library...'
-            style={styles.search}
-          />
-        </div>
-
-        <div style={styles.actions}>
-          <AdminBar
-            isAdmin={isAdmin}
-            onAdd={() => setShowAdd(true)}
-            onUnlock={handleUnlock}
-            onLock={handleLock}
-          />
-        </div>
-      </header>
-
-      {/* Nav */}
-      <nav style={styles.nav}>
-        <button
-          style={{
-            ...styles.navBtn,
-            ...(view === "library" ? styles.navBtnActive : null),
-          }}
-          onClick={() => setView("library")}
-        >
-          Library
-        </button>
-        <button
-          style={{
-            ...styles.navBtn,
-            ...(view === "favorites" ? styles.navBtnActive : null),
-          }}
-          onClick={() => setView("favorites")}
-        >
-          Favorites
-        </button>
-      </nav>
-
-      {/* Grid */}
-      <div style={styles.grid}>
-        {filtered.length === 0 ? (
-          <div style={styles.empty}>
-            {view === "favorites"
-              ? "No favorites yet. Tap ♡ to add."
-              : "No films found."}
+          <div className='bf-searchWrap'>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder='Search'
+              className='bf-search'
+            />
+            <button className='bf-searchBtn' aria-label='Search'>
+              🔍
+            </button>
           </div>
-        ) : (
-          filtered.map((v) => (
-            <div
-              key={v.id}
-              style={styles.card}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.transform = "scale(1.03)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.transform = "scale(1.0)")
-              }
-            >
-              <div style={styles.thumbWrap} onClick={() => setPlaying(v)}>
-                <img
-                  src={
-                    v.thumbnail ||
-                    "https://via.placeholder.com/800x450?text=No+Thumbnail"
-                  }
-                  alt={v.title || "Untitled"}
-                  style={styles.thumb}
-                />
-                {v.duration ? (
-                  <span style={styles.badge}>{v.duration}</span>
-                ) : null}
-              </div>
 
-              <div style={styles.cardBody}>
-                <div style={styles.titleRow}>
-                  <div style={styles.cardTitle}>{v.title || "Untitled"}</div>
+          <div className='bf-actions'>
+            <div className='bf-viewToggle'>
+              <button
+                className={`bf-navBtn ${view === "library" ? "is-active" : ""}`}
+                onClick={() => setView("library")}
+              >
+                Library
+              </button>
+              <button
+                className={`bf-navBtn ${
+                  view === "favorites" ? "is-active" : ""
+                }`}
+                onClick={() => setView("favorites")}
+              >
+                Favorites
+              </button>
+            </div>
+
+            <AdminBar
+              isAdmin={isAdmin}
+              onAdd={() => setShowAdd(true)}
+              onUnlock={requestUnlock}
+              onLock={requestLock}
+              onChangePin={requestChangePin}
+            />
+          </div>
+        </header>
+
+        {/* CONTINUE WATCHING (horizontal shelf) */}
+        {view === "library" && continueList.length > 0 && (
+          <section className='bf-cont'>
+            <div className='bf-contHeader'>
+              <div className='bf-hl'>⏸ Continue Watching</div>
+            </div>
+
+            <div className='favs-scroll'>
+              {continueList.map((v) => (
+                <div key={`cw-${v.id}`} className='bf-contCard'>
                   <button
-                    style={{
-                      ...styles.favBtn,
-                      ...(v.favorite ? styles.favBtnActive : null),
-                    }}
+                    className='bf-cardClear'
+                    title='Remove from Continue Watching'
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleFavorite(v.id);
+                      clearProgress(v.id);
                     }}
-                    title={
-                      v.favorite ? "Remove from Favorites" : "Add to Favorites"
-                    }
                   >
-                    {v.favorite ? "♥" : "♡"}
+                    ✕
                   </button>
+
+                  <div
+                    className='bf-favThumbWrap'
+                    onClick={() => resumeVideo(v)}
+                  >
+                    <img
+                      src={
+                        v.thumbnail ||
+                        "https://via.placeholder.com/640x360?text=No+Thumbnail"
+                      }
+                      alt={v.title || "Untitled"}
+                      className='bf-favThumb'
+                    />
+                  </div>
+                  <div className='bf-favMeta'>
+                    <div className='bf-favTitle' title={v.title}>
+                      {v.title || "Untitled"}
+                    </div>
+                    <button
+                      className='bf-btn bf-btn--ghost'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        resumeVideo(v);
+                      }}
+                    >
+                      ► Resume
+                    </button>
+                  </div>
                 </div>
-
-                {Array.isArray(v.tags) && v.tags.length > 0 ? (
-                  <div style={styles.meta}>#{v.tags.join(" #")}</div>
-                ) : null}
-
-                <button style={styles.watchBtn} onClick={() => setPlaying(v)}>
-                  ▶︎ Watch
-                </button>
-              </div>
+              ))}
             </div>
-          ))
+          </section>
         )}
+
+        {/* LIBRARY GRID */}
+        <div id='library-grid' className='bf-grid'>
+          {filtered.length === 0 ? (
+            <div className='bf-empty'>
+              {view === "favorites"
+                ? "No favorites yet. Tap ♡ to add."
+                : "No films found."}
+            </div>
+          ) : (
+            filtered.map((v) => {
+              const hasProgress = !!progress?.[v.id]?.t;
+              return (
+                <div key={v.id} className='bf-card'>
+                  <div className='bf-thumbWrap' onClick={() => setPlaying(v)}>
+                    <img
+                      src={
+                        v.thumbnail ||
+                        "https://via.placeholder.com/800x450?text=No+Thumbnail"
+                      }
+                      alt={v.title || "Untitled"}
+                      className='bf-thumb'
+                    />
+                    {v.duration ? (
+                      <span className='bf-badge'>{v.duration}</span>
+                    ) : null}
+                  </div>
+
+                  <div className='bf-cardBody'>
+                    <div className='bf-titleRow'>
+                      <div className='bf-cardTitle'>
+                        {v.title || "Untitled"}
+                      </div>
+                      <div className='bf-titleActions'>
+                        {hasProgress && (
+                          <button
+                            className='bf-pillResume'
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              resumeVideo(v);
+                            }}
+                          >
+                            ► Resume
+                          </button>
+                        )}
+                        <button
+                          className={`bf-favBtn ${
+                            v.favorite ? "is-active" : ""
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(v.id);
+                          }}
+                          aria-label='Toggle favorite'
+                          title={
+                            v.favorite
+                              ? "Remove from Favorites"
+                              : "Add to Favorites"
+                          }
+                        >
+                          {v.favorite ? "♥" : "♡"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {Array.isArray(v.tags) && v.tags.length > 0 ? (
+                      <div className='bf-meta'>#{v.tags.join(" #")}</div>
+                    ) : null}
+
+                    <button
+                      className='bf-watchBtn'
+                      onClick={() => setPlaying(v)}
+                    >
+                      ▶︎ Watch
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      {/* Player Overlay */}
+      {/* PLAYER OVERLAY */}
       {playing && (
-        <div style={styles.overlay} onClick={() => setPlaying(null)}>
-          <div style={styles.player} onClick={(e) => e.stopPropagation()}>
+        <div className='bf-overlay' onClick={() => setPlaying(null)}>
+          <div className='bf-player' onClick={(e) => e.stopPropagation()}>
             <video
+              ref={videoRef}
               key={playing.src}
               src={playing.src}
-              style={styles.video}
+              className='bf-video'
               controls
               autoPlay
               playsInline
+              onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={handleEnded}
               onError={() =>
                 alert("Unable to play this video. Check the source URL.")
               }
             />
-            <div style={styles.playerBar}>
+            <div className='bf-playerBar'>
               <div>{playing.title || "Untitled"}</div>
-              <button style={styles.close} onClick={() => setPlaying(null)}>
+              <button className='bf-close' onClick={() => setPlaying(null)}>
                 ✕
               </button>
             </div>
@@ -190,160 +361,48 @@ export default function Library() {
         </div>
       )}
 
-      {/* Add modal */}
+      {/* MODALS */}
       {showAdd && isAdmin && (
         <AddVideoModal onClose={() => setShowAdd(false)} />
+      )}
+
+      {showUnlock && (
+        <AdminUnlockModal
+          onClose={() => setShowUnlock(false)}
+          onSubmit={verifyPinAndUnlock}
+          onForgot={() => {
+            setShowUnlock(false);
+            setShowForgotPin(true);
+          }}
+        />
+      )}
+
+      {showLockConfirm && (
+        <ConfirmModal
+          title='Lock Admin?'
+          message='Hide admin controls until the PIN is re-entered.'
+          confirmText='Lock'
+          cancelText='Cancel'
+          onConfirm={doLock}
+          onCancel={() => setShowLockConfirm(false)}
+        />
+      )}
+
+      {showChangePin && (
+        <ChangePinModal
+          onClose={() => setShowChangePin(false)}
+          getCurrentPin={getEffectivePin}
+          onChangePin={applyChangePin}
+        />
+      )}
+
+      {showForgotPin && (
+        <ForgotPinModal
+          onClose={() => setShowForgotPin(false)}
+          masterCode={MASTER_CODE}
+          onResetPin={resetPinFromMaster}
+        />
       )}
     </div>
   );
 }
-
-const styles = {
-  page: {
-    background: "#0b0b0f",
-    minHeight: "100vh",
-    color: "#fff",
-    padding: 16,
-  },
-
-  header: {
-    display: "grid",
-    gridTemplateColumns: "1fr 2fr 1fr",
-    alignItems: "center",
-    gap: 16,
-    marginBottom: 16,
-  },
-  logo: { color: "#f3c969", fontWeight: "bold", fontSize: 22 },
-  searchWrap: { display: "flex", justifyContent: "center" },
-  search: {
-    width: "100%",
-    maxWidth: 420,
-    background: "#121218",
-    color: "#fff",
-    border: "1px solid #22232b",
-    borderRadius: 8,
-    padding: "10px 12px",
-  },
-  actions: { display: "flex", justifyContent: "flex-end" },
-
-  nav: { display: "flex", justifyContent: "center", gap: 12, marginBottom: 16 },
-  navBtn: {
-    border: "1px solid #22232b",
-    borderRadius: 8,
-    padding: "8px 16px",
-    fontWeight: "bold",
-    background: "#121218",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  navBtnActive: {
-    borderColor: "#f3c969",
-    background: "#f3c969",
-    color: "#0b0b0f",
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    gap: 16,
-  },
-  empty: { textAlign: "center", color: "#9aa0a6", gridColumn: "1 / -1" },
-
-  card: {
-    border: "1px solid #22232b",
-    borderRadius: 12,
-    background: "#121218",
-    overflow: "hidden",
-    transition: "transform 0.25s ease, box-shadow 0.25s ease",
-  },
-  thumbWrap: {
-    position: "relative",
-    aspectRatio: "16/9",
-    cursor: "pointer",
-    overflow: "hidden",
-  },
-  thumb: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    transition: "transform 0.3s ease",
-  },
-  badge: {
-    position: "absolute",
-    right: 8,
-    bottom: 8,
-    background: "rgba(0,0,0,0.7)",
-    padding: "4px 8px",
-    borderRadius: 8,
-    fontSize: 12,
-  },
-
-  cardBody: { padding: 12 },
-  titleRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 6,
-  },
-  cardTitle: { fontWeight: 700, fontSize: 16 },
-  favBtn: {
-    border: "1px solid #22232b",
-    background: "#121218",
-    color: "#fff",
-    borderRadius: 8,
-    padding: "6px 10px",
-    cursor: "pointer",
-    lineHeight: 1,
-    minWidth: 38,
-  },
-  favBtnActive: {
-    border: "1px solid #f3c969",
-    color: "#f3c969",
-    background: "#111015",
-  },
-  meta: { color: "#9aa0a6", fontSize: 12, marginBottom: 10 },
-  watchBtn: {
-    border: "1px solid #f3c969",
-    background: "#f3c969",
-    color: "#0b0b0f",
-    borderRadius: 8,
-    fontWeight: 800,
-    padding: "8px 12px",
-    cursor: "pointer",
-  },
-
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.9)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 9999,
-    padding: 16,
-  },
-  player: {
-    width: "100%",
-    maxWidth: 980,
-    background: "#0b0b0f",
-    border: "1px solid #22232b",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  video: { width: "100%", height: "auto", background: "#000" },
-  playerBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "10px 12px",
-    borderTop: "1px solid #22232b",
-  },
-  close: {
-    border: "1px solid #f3c969",
-    background: "transparent",
-    color: "#f3c969",
-    borderRadius: 8,
-    padding: "4px 10px",
-    cursor: "pointer",
-  },
-};

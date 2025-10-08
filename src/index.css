@@ -1,37 +1,375 @@
-:root {
-  color-scheme: dark;
-  --bg: #0b0b0f;
-  --card: #121218;
-  --text: #ffffff;
-  --muted: #9aa0a6;
-  --border: #22232b;
-  --accent: #f3c969;
-  --accentText: #0b0b0f;
-}
+/* ==== YOUTUBE-LITE THEME (non-bloated, flat, fast) ==== */
 
-* {
-  box-sizing: border-box;
+/* Palette (YT dark-ish) */
+:root {
+  --yt-bg: #0f0f0f;
+  /* page background */
+  --yt-header: #0f0f0f;
+  /* sticky header bg */
+  --yt-panel: #212121;
+  /* cards, inputs */
+  --yt-line: #303030;
+  /* borders, dividers */
+  --yt-text: #f1f1f1;
+  /* primary text */
+  --yt-sub: #aaaaaa;
+  /* secondary text */
+  --yt-accent: #ff3b3b;
+  /* play/red accent */
+  --yt-radius: 8px;
 }
 
 html,
 body,
 #root {
+  background: var(--yt-bg);
+  color: var(--yt-text);
+}
+
+/* Container width similar to YT content column */
+.bf-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 72px 16px 32px;
+  /* header is sticky; add top padding */
+}
+
+/* Sticky header like YT */
+.bf-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--yt-header);
+  display: grid;
+  grid-template-columns: 220px minmax(360px, 680px) 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--yt-line);
+}
+
+/* Logo left */
+.bf-logo {
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Center search: input + icon button */
+.bf-searchWrap {
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 0;
+}
+
+.bf-search {
+  width: 100%;
+  background: var(--yt-bg);
+  color: var(--yt-text);
+  border: 1px solid var(--yt-line);
+  border-right: none;
+  border-radius: var(--yt-radius) 0 0 var(--yt-radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.bf-search::placeholder {
+  color: var(--yt-sub);
+}
+
+.bf-searchBtn {
+  border: 1px solid var(--yt-line);
+  border-radius: 0 var(--yt-radius) var(--yt-radius) 0;
+  background: #222;
+  color: var(--yt-text);
+  cursor: pointer;
+}
+
+/* Right: Library/Favorites + Admin */
+.bf-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bf-viewToggle {
+  display: flex;
+  gap: 8px;
+}
+
+.bf-navBtn {
+  background: transparent;
+  border: 1px solid var(--yt-line);
+  color: var(--yt-text);
+  padding: 6px 12px;
+  border-radius: var(--yt-radius);
+  font-weight: 600;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.bf-navBtn:hover {
+  background: #1a1a1a;
+  border-color: #3a3a3a;
+}
+
+.bf-navBtn.is-active {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+}
+
+/* Continue Watching strip (horizontal) */
+.bf-cont {
+  margin: 14px 0 12px;
+}
+
+.bf-contHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.bf-hl {
+  font-weight: 700;
+}
+
+.favs-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.bf-contCard {
+  position: relative;
+  min-width: 300px;
+  max-width: 360px;
+  background: transparent;
+  /* YT thumbs float; metadata below */
+  border: none;
+}
+
+.bf-cardClear {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, .6);
+  color: #eee;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.bf-favThumbWrap {
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+
+.bf-favThumb {
+  width: 100%;
   height: 100%;
-  margin: 0;
+  object-fit: cover;
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
+.bf-favMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px;
 }
 
-button {
-  font: inherit;
+.bf-favTitle {
+  font-weight: 600;
+  color: var(--yt-text);
 }
 
-/* Optional: prevent image drag ghost */
-img {
-  user-select: none;
-  -webkit-user-drag: none;
+/* Grid like YT: 4 columns down to 3/2/1 responsively */
+.bf-grid {
+  display: grid;
+  gap: 16px 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .bf-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .bf-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .bf-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cards: flat, no heavy glow */
+.bf-card {
+  background: transparent;
+  /* YT uses transparent card with thumb panel */
+  border: none;
+  max-width: 100%;
+}
+
+.bf-thumbWrap {
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+  position: relative;
+  cursor: pointer;
+}
+
+.bf-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bf-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(0, 0, 0, .7);
+  color: #eee;
+  border: 1px solid rgba(255, 255, 255, .2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* Meta below thumb like YT: title on two lines, actions on the right */
+.bf-cardBody {
+  padding: 8px 2px 0;
+}
+
+.bf-titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bf-cardTitle {
+  font-weight: 700;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  /* two-line title like YT */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bf-titleActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bf-favBtn {
+  background: transparent;
+  border: 1px solid var(--yt-line);
+  color: #fff;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.bf-favBtn.is-active {
+  background: var(--yt-accent);
+  border-color: var(--yt-accent);
+}
+
+.bf-meta {
+  color: var(--yt-sub);
+  font-size: 12.5px;
+  margin: 4px 0 8px;
+}
+
+/* Watch button: lean (outlined) */
+.bf-watchBtn {
+  width: auto;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--yt-text);
+  border: 1px solid var(--yt-line);
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+.bf-watchBtn:hover {
+  border-color: #3a3a3a;
+  background: #1a1a1a;
+}
+
+/* Empty state */
+.bf-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--yt-sub);
+  padding: 24px 8px;
+  border: 1px dashed var(--yt-line);
+  border-radius: 12px;
+}
+
+/* Player overlay: keep minimal */
+.bf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.bf-player {
+  width: min(1280px, 96vw);
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--yt-line);
+}
+
+.bf-video {
+  width: 100%;
+  height: auto;
+  background: #000;
+}
+
+.bf-playerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-top: 1px solid var(--yt-line);
+  background: #111;
+}
+
+.bf-close {
+  background: transparent;
+  border: 1px solid var(--yt-line);
+  color: #ddd;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.bf-close:hover {
+  background: #1a1a1a;
 }

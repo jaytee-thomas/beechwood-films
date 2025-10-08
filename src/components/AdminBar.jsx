@@ -1,51 +1,39 @@
 import React from "react";
 
-export default function AdminBar({ isAdmin, onAdd, onUnlock, onLock }) {
-  return isAdmin ? (
-    <div style={{ display: "flex", gap: 8 }}>
-      <button
-        onClick={onAdd}
-        style={{
-          border: "1px solid #f3c969",
-          background: "#f3c969",
-          color: "#0b0b0f",
-          borderRadius: 8,
-          padding: "8px 12px",
-          fontWeight: 800,
-          cursor: "pointer",
-        }}
-      >
-        ＋ Add Film
-      </button>
-      <button
-        onClick={onLock}
-        style={{
-          border: "1px solid #e35d6a",
-          background: "transparent",
-          color: "#e35d6a",
-          borderRadius: 8,
-          padding: "8px 12px",
-          fontWeight: 700,
-          cursor: "pointer",
-        }}
-      >
-        Lock
-      </button>
+export default function AdminBar({
+  isAdmin,
+  onAdd,
+  onUnlock,
+  onLock,
+  onClearProgress,
+  onClearFavorites,
+  onChangePin, // ✅ new
+}) {
+  return (
+    <div className='bf-adminbar'>
+      {!isAdmin ? (
+        <button className='bf-btn bf-btn--brand' onClick={onUnlock}>
+          🔓 Admin
+        </button>
+      ) : (
+        <>
+          <button className='bf-btn bf-btn--add' onClick={onAdd}>
+            ➕ Add
+          </button>
+          <button className='bf-btn bf-btn--warn' onClick={onClearProgress}>
+            🕒 Clear Progress
+          </button>
+          <button className='bf-btn bf-btn--warn' onClick={onClearFavorites}>
+            💔 Clear Favorites
+          </button>
+          <button className='bf-btn bf-btn--brand' onClick={onChangePin}>
+            🔑 Change PIN
+          </button>
+          <button className='bf-btn bf-btn--lock' onClick={onLock}>
+            🔒 Lock
+          </button>
+        </>
+      )}
     </div>
-  ) : (
-    <button
-      onClick={onUnlock}
-      style={{
-        border: "1px solid #22232b",
-        background: "#121218",
-        color: "#fff",
-        borderRadius: 8,
-        padding: "8px 12px",
-        fontWeight: 700,
-        cursor: "pointer",
-      }}
-    >
-      Unlock Admin
-    </button>
   );
 }

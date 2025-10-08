@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 const KEY = "bf_videos_v1";
+const PROGRESS_KEY = "bf_progress_v1"; // { [videoId]: { t: seconds, updatedAt: epoch_ms } }
 
 function loadVideos() {
   try {
@@ -44,8 +45,21 @@ function saveVideos(videos) {
   try { localStorage.setItem(KEY, JSON.stringify(videos)); } catch {}
 }
 
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+}
+
+function saveProgress(progress) {
+  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch {}
+}
+
 const useLibraryStore = create((set, get) => ({
   videos: loadVideos(),
+  progress: loadProgress(), // { [id]: { t, updatedAt } }
 
   addVideo: (video) => {
     const next = { id: Date.now(), favorite: false, ...video };
@@ -64,8 +78,12 @@ const useLibraryStore = create((set, get) => ({
 
   removeVideo: (id) => {
     const videos = get().videos.filter((v) => v.id !== id);
+    // also clear progress for removed video
+    const progress = { ...get().progress };
+    delete progress[id];
     saveVideos(videos);
-    set({ videos });
+    saveProgress(progress);
+    set({ videos, progress });
   },
 
   toggleFavorite: (id) => {
@@ -74,6 +92,30 @@ const useLibraryStore = create((set, get) => ({
     );
     saveVideos(videos);
     set({ videos });
+    },
+  clearFavorites: () => {
+  const videos = get().videos.map((v) => ({ ...v, favorite: false }));
+  // keep progress intact
+  try { localStorage.setItem("bf_videos_v1", JSON.stringify(videos)); } catch {}
+  set({ videos });
+},
+  // ---- Continue Watching actions ----
+  setProgress: (id, seconds) => {
+    const p = { ...get().progress, [id]: { t: Math.max(0, Math.floor(seconds)), updatedAt: Date.now() } };
+    saveProgress(p);
+    set({ progress: p });
+  },
+
+  clearProgress: (id) => {
+    const p = { ...get().progress };
+    delete p[id];
+    saveProgress(p);
+    set({ progress: p });
+  },
+
+  clearAllProgress: () => {
+    saveProgress({});
+    set({ progress: {} });
   },
 }));
 

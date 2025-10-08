@@ -1,58 +1,147 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import useLibraryStore from "../store/useLibraryStore";
 
 export default function AddVideoModal({ onClose }) {
   const addVideo = useLibraryStore((s) => s.addVideo);
   const [title, setTitle] = useState("");
-  const [src, setSrc] = useState("");
   const [thumbnail, setThumbnail] = useState("");
+  const [src, setSrc] = useState("");
   const [duration, setDuration] = useState("");
+  const [tags, setTags] = useState("");
 
-  function submit(e) {
+  const overlayRef = useRef(null);
+  const firstInputRef = useRef(null);
+
+  // Focus first field when modal opens
+  useEffect(() => {
+    firstInputRef.current?.focus();
+  }, []);
+
+  // Close on ESC
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function handleOverlayClick(e) {
+    if (e.target === overlayRef.current) onClose();
+  }
+
+  function onSubmit(e) {
     e.preventDefault();
-    if (!title || !src) {
-      alert("Title and Video URL are required.");
+
+    if (!title.trim() || !src.trim()) {
+      alert("Please provide at least a Title and a Video URL.");
       return;
     }
-    addVideo({ title, src, thumbnail, duration, tags: [] });
+
+    const parsedTags = tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    addVideo({
+      title: title.trim(),
+      thumbnail: thumbnail.trim(),
+      src: src.trim(),
+      duration: duration.trim(),
+      tags: parsedTags,
+    });
+
     onClose();
   }
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ margin: 0, marginBottom: 8 }}>Add Film</h3>
-        <form onSubmit={submit} style={{ display: "grid", gap: 8 }}>
-          <input
-            placeholder='Title *'
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            placeholder='Video URL (MP4) *'
-            value={src}
-            onChange={(e) => setSrc(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            placeholder='Thumbnail URL'
-            value={thumbnail}
-            onChange={(e) => setThumbnail(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            placeholder='Duration (e.g., 12:34)'
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            style={styles.input}
-          />
-          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-            <button type='submit' style={styles.primary}>
-              Save
-            </button>
-            <button type='button' onClick={onClose} style={styles.ghost}>
+    <div
+      ref={overlayRef}
+      className='bf-modalOverlay'
+      role='dialog'
+      aria-modal='true'
+      aria-labelledby='bf-addvideo-title'
+      onClick={handleOverlayClick}
+    >
+      <div className='bf-modal'>
+        <header className='bf-modalHeader'>
+          <h2 id='bf-addvideo-title' className='bf-modalTitle'>
+            ➕ Add Film
+          </h2>
+          <button className='bf-close' onClick={onClose} aria-label='Close'>
+            ✕
+          </button>
+        </header>
+
+        <form className='bf-modalBody' onSubmit={onSubmit}>
+          <div className='bf-field'>
+            <label className='bf-label'>Title *</label>
+            <input
+              ref={firstInputRef}
+              className='bf-input'
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder='Harlem Dancers'
+              required
+            />
+          </div>
+
+          <div className='bf-field'>
+            <label className='bf-label'>Thumbnail URL</label>
+            <input
+              className='bf-input'
+              value={thumbnail}
+              onChange={(e) => setThumbnail(e.target.value)}
+              placeholder='https://example.com/poster.jpg'
+            />
+          </div>
+
+          <div className='bf-field'>
+            <label className='bf-label'>Video URL *</label>
+            <input
+              className='bf-input'
+              value={src}
+              onChange={(e) => setSrc(e.target.value)}
+              placeholder='https://…/video.mp4'
+              required
+            />
+            <p className='bf-help'>
+              MP4 (H.264/AAC) URLs play best across browsers.
+            </p>
+          </div>
+
+          <div className='bf-row'>
+            <div className='bf-field'>
+              <label className='bf-label'>Duration</label>
+              <input
+                className='bf-input'
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder='14:47'
+              />
+            </div>
+
+            <div className='bf-field'>
+              <label className='bf-label'>Tags (comma-separated)</label>
+              <input
+                className='bf-input'
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder='doc, short'
+              />
+            </div>
+          </div>
+
+          <div className='bf-actionsRow'>
+            <button
+              type='button'
+              className='bf-btn bf-btn--lock'
+              onClick={onClose}
+            >
               Cancel
+            </button>
+            <button type='submit' className='bf-btn bf-btn--add'>
+              Save Film
             </button>
           </div>
         </form>
@@ -60,50 +149,3 @@ export default function AddVideoModal({ onClose }) {
     </div>
   );
 }
-
-const styles = {
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.7)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 9999,
-    padding: 16,
-  },
-  modal: {
-    width: "100%",
-    maxWidth: 520,
-    background: "#121218",
-    color: "#fff",
-    border: "1px solid #22232b",
-    borderRadius: 12,
-    padding: 16,
-  },
-  input: {
-    background: "#0b0b0f",
-    color: "#fff",
-    border: "1px solid #22232b",
-    borderRadius: 8,
-    padding: "10px 12px",
-    outline: "none",
-  },
-  primary: {
-    border: "1px solid #f3c969",
-    background: "#f3c969",
-    color: "#0b0b0f",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  ghost: {
-    border: "1px solid #22232b",
-    background: "transparent",
-    color: "#fff",
-    borderRadius: 8,
-    padding: "8px 12px",
-    cursor: "pointer",
-  },
-};
