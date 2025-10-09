@@ -1,131 +1,133 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 export default function ChangePinModal({
   onClose,
-  onChangePin,
   getCurrentPin,
+  onChangePin,
 }) {
   const [current, setCurrent] = useState("");
   const [nextPin, setNextPin] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
-  const overlayRef = useRef(null);
-  const firstRef = useRef(null);
+  const [okMsg, setOkMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    firstRef.current?.focus();
-    function onKey(e) {
-      if (e.key === "Escape") onClose();
+  const effectivePin = useMemo(() => {
+    try {
+      return getCurrentPin?.() ?? "";
+    } catch {
+      return "";
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [getCurrentPin]);
 
-  function handleOverlayClick(e) {
-    if (e.target === overlayRef.current) onClose();
+  function validate() {
+    if (!current) return "Enter your current PIN.";
+    if (current !== effectivePin) return "Current PIN is incorrect.";
+    if (!/^\d{4,8}$/.test(nextPin)) return "New PIN must be 4–8 digits.";
+    if (confirm !== nextPin) return "PIN confirmation does not match.";
+    if (nextPin === current)
+      return "New PIN must be different from current PIN.";
+    return "";
   }
 
-  function validate(pin) {
-    // 4–12 digits recommended; tweak as you like
-    return /^\d{4,12}$/.test(pin);
-  }
-
-  function submit(e) {
-    e.preventDefault();
-    const effective = getCurrentPin();
-    if (current !== effective) {
-      setError("Current PIN is incorrect.");
+  async function handleSubmit(e) {
+    e?.preventDefault();
+    setError("");
+    setOkMsg("");
+    const problem = validate();
+    if (problem) {
+      setError(problem);
       return;
     }
-    if (!validate(nextPin)) {
-      setError("New PIN must be 4–12 digits.");
-      return;
+    setLoading(true);
+    try {
+      await Promise.resolve(onChangePin(nextPin));
+      setOkMsg("PIN updated!");
+      setTimeout(() => onClose?.(), 650);
+    } catch {
+      setError("Could not update PIN. Try again.");
+    } finally {
+      setLoading(false);
     }
-    if (nextPin !== confirm) {
-      setError("New PIN and confirmation do not match.");
-      return;
-    }
-    onChangePin(nextPin);
-    onClose();
   }
 
   return (
-    <div
-      ref={overlayRef}
-      className='bf-modalOverlay'
-      role='dialog'
-      aria-modal='true'
-      aria-labelledby='bf-changepin-title'
-      onClick={handleOverlayClick}
-    >
-      <div className='bf-modal'>
-        <header className='bf-modalHeader'>
-          <h2 id='bf-changepin-title' className='bf-modalTitle'>
-            🔑 Change Admin PIN
-          </h2>
-          <button className='bf-close' onClick={onClose} aria-label='Close'>
-            ✕
-          </button>
-        </header>
+    <div className='bf-modalOverlay' onClick={onClose}>
+      <div
+        className='bf-modal glassy'
+        onClick={(e) => e.stopPropagation()}
+        role='dialog'
+        aria-modal='true'
+      >
+        <div className='bf-modalHeader'>
+          <h2 className='bf-modalTitle'>🔒 Change Admin PIN</h2>
+        </div>
 
-        <form className='bf-modalBody' onSubmit={submit}>
-          <div className='bf-field'>
-            <label className='bf-label'>Current PIN</label>
-            <input
-              ref={firstRef}
-              className='bf-input'
-              type='password'
-              inputMode='numeric'
-              pattern='[0-9]*'
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              placeholder='••••'
-              required
-            />
-          </div>
-
-          <div className='bf-row'>
-            <div className='bf-field'>
-              <label className='bf-label'>New PIN</label>
+        <form onSubmit={handleSubmit} className='bf-modalBody'>
+          <div className='bf-formGrid'>
+            <label className='bf-label'>
+              Current PIN
               <input
-                className='bf-input'
                 type='password'
                 inputMode='numeric'
-                pattern='[0-9]*'
+                maxLength={8}
+                className='bf-input'
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+                placeholder='••••'
+                autoFocus
+              />
+            </label>
+
+            <label className='bf-label'>
+              New PIN
+              <input
+                type='password'
+                inputMode='numeric'
+                maxLength={8}
+                className='bf-input'
                 value={nextPin}
                 onChange={(e) => setNextPin(e.target.value)}
-                placeholder='4–12 digits'
-                required
+                placeholder='4–8 digits'
               />
-            </div>
-            <div className='bf-field'>
-              <label className='bf-label'>Confirm New PIN</label>
+            </label>
+
+            <label className='bf-label'>
+              Confirm New PIN
               <input
-                className='bf-input'
                 type='password'
                 inputMode='numeric'
-                pattern='[0-9]*'
+                maxLength={8}
+                className='bf-input'
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                placeholder='Re-enter PIN'
-                required
+                placeholder='Repeat new PIN'
               />
-            </div>
+            </label>
           </div>
 
-          {error ? <p className='bf-error'>{error}</p> : null}
+          {error && <div className='bf-error'>{error}</div>}
+          {okMsg && <div className='bf-ok'>{okMsg}</div>}
 
-          <div className='bf-actionsRow'>
+          <div className='bf-modalActions'>
+            <button
+              type='submit'
+              className='bf-btn bf-btn--primary'
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save PIN"}
+            </button>
             <button
               type='button'
-              className='bf-btn bf-btn--lock'
+              className='bf-btn bf-btn--ghost'
               onClick={onClose}
             >
               Cancel
             </button>
-            <button type='submit' className='bf-btn bf-btn--add'>
-              Save PIN
-            </button>
+          </div>
+
+          <div className='bf-help'>
+            Tip: Use a PIN you’ll remember but others won’t guess.
           </div>
         </form>
       </div>

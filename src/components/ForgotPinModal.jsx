@@ -1,151 +1,123 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 
 export default function ForgotPinModal({ onClose, masterCode, onResetPin }) {
   const [code, setCode] = useState("");
-  const [step, setStep] = useState(1); // 1 = verify code, 2 = set new PIN
-  const [nextPin, setNextPin] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
+  const [okMsg, setOkMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const overlayRef = useRef(null);
-  const firstRef = useRef(null);
-
-  useEffect(() => {
-    firstRef.current?.focus();
-    function onKey(e) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  function handleOverlayClick(e) {
-    if (e.target === overlayRef.current) onClose();
+  function validate() {
+    if (!code) return "Enter the master code.";
+    if (code !== (masterCode ?? "")) return "Master code is incorrect.";
+    if (!/^\d{4,8}$/.test(newPin)) return "New PIN must be 4–8 digits.";
+    if (confirm !== newPin) return "PIN confirmation does not match.";
+    return "";
   }
 
-  function validate(pin) {
-    return /^\d{4,12}$/.test(pin);
-  }
-
-  function verifyCode(e) {
-    e.preventDefault();
-    if (!code.trim()) {
-      setError("Enter the master code.");
-      return;
-    }
-    if (code.trim() !== String(masterCode || "")) {
-      setError("Master code is incorrect.");
-      return;
-    }
+  async function handleSubmit(e) {
+    e?.preventDefault();
     setError("");
-    setStep(2);
-  }
-
-  function setNewPin(e) {
-    e.preventDefault();
-    if (!validate(nextPin)) {
-      setError("New PIN must be 4–12 digits.");
+    setOkMsg("");
+    const problem = validate();
+    if (problem) {
+      setError(problem);
       return;
     }
-    if (nextPin !== confirm) {
-      setError("New PIN and confirmation do not match.");
-      return;
+    setLoading(true);
+    try {
+      await Promise.resolve(onResetPin(newPin));
+      setOkMsg("PIN reset! You’re now unlocked.");
+      setTimeout(() => onClose?.(), 800);
+    } catch {
+      setError("Could not reset PIN. Try again.");
+    } finally {
+      setLoading(false);
     }
-    onResetPin(nextPin);
-    onClose();
   }
 
   return (
-    <div
-      ref={overlayRef}
-      className='bf-modalOverlay'
-      role='dialog'
-      aria-modal='true'
-      aria-labelledby='bf-forgotpin-title'
-      onClick={handleOverlayClick}
-    >
-      <div className='bf-modal'>
-        <header className='bf-modalHeader'>
-          <h2 id='bf-forgotpin-title' className='bf-modalTitle'>
-            🆘 Reset Admin PIN
-          </h2>
-          <button className='bf-close' onClick={onClose} aria-label='Close'>
-            ✕
-          </button>
-        </header>
+    <div className='bf-modalOverlay' onClick={onClose}>
+      <div
+        className='bf-modal glassy'
+        onClick={(e) => e.stopPropagation()}
+        role='dialog'
+        aria-modal='true'
+      >
+        <div className='bf-modalHeader'>
+          <h2 className='bf-modalTitle'>🧩 Forgot PIN</h2>
+        </div>
 
-        {step === 1 ? (
-          <form className='bf-modalBody' onSubmit={verifyCode}>
-            <div className='bf-field'>
-              <label className='bf-label'>Master Code</label>
+        <form onSubmit={handleSubmit} className='bf-modalBody'>
+          <p className='bf-modalText'>
+            Enter your <strong>master code</strong> to set a new admin PIN.
+          </p>
+
+          <label className='bf-label'>
+            Master Code
+            <input
+              type='text'
+              className='bf-input'
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder='Paste your master code'
+              autoFocus
+            />
+          </label>
+
+          <div className='bf-formGrid'>
+            <label className='bf-label'>
+              New PIN
               <input
-                ref={firstRef}
+                type='password'
+                inputMode='numeric'
+                maxLength={8}
                 className='bf-input'
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder='Enter your master code'
-                required
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value)}
+                placeholder='4–8 digits'
               />
-              {error ? <p className='bf-error'>{error}</p> : null}
-            </div>
-            <div className='bf-actionsRow'>
-              <button
-                type='button'
-                className='bf-btn bf-btn--lock'
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-              <button type='submit' className='bf-btn bf-btn--add'>
-                Verify
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form className='bf-modalBody' onSubmit={setNewPin}>
-            <div className='bf-row'>
-              <div className='bf-field'>
-                <label className='bf-label'>New PIN</label>
-                <input
-                  className='bf-input'
-                  type='password'
-                  inputMode='numeric'
-                  pattern='[0-9]*'
-                  value={nextPin}
-                  onChange={(e) => setNextPin(e.target.value)}
-                  placeholder='4–12 digits'
-                  required
-                />
-              </div>
-              <div className='bf-field'>
-                <label className='bf-label'>Confirm New PIN</label>
-                <input
-                  className='bf-input'
-                  type='password'
-                  inputMode='numeric'
-                  pattern='[0-9]*'
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder='Re-enter PIN'
-                  required
-                />
-              </div>
-            </div>
-            {error ? <p className='bf-error'>{error}</p> : null}
-            <div className='bf-actionsRow'>
-              <button
-                type='button'
-                className='bf-btn bf-btn--lock'
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-              <button type='submit' className='bf-btn bf-btn--add'>
-                Save PIN
-              </button>
-            </div>
-          </form>
-        )}
+            </label>
+
+            <label className='bf-label'>
+              Confirm New PIN
+              <input
+                type='password'
+                inputMode='numeric'
+                maxLength={8}
+                className='bf-input'
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder='Repeat new PIN'
+              />
+            </label>
+          </div>
+
+          {error && <div className='bf-error'>{error}</div>}
+          {okMsg && <div className='bf-ok'>{okMsg}</div>}
+
+          <div className='bf-modalActions'>
+            <button
+              type='submit'
+              className='bf-btn bf-btn--primary'
+              disabled={loading}
+            >
+              {loading ? "Resetting..." : "Reset PIN"}
+            </button>
+            <button
+              type='button'
+              className='bf-btn bf-btn--ghost'
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div className='bf-help'>
+            Don’t have the master code? Contact the site owner.
+          </div>
+        </form>
       </div>
     </div>
   );

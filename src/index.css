@@ -1,375 +1,375 @@
-/* ==== YOUTUBE-LITE THEME (non-bloated, flat, fast) ==== */
-
-/* Palette (YT dark-ish) */
+/* ===== Base ===== */
 :root {
-  --yt-bg: #0f0f0f;
-  /* page background */
-  --yt-header: #0f0f0f;
-  /* sticky header bg */
-  --yt-panel: #212121;
-  /* cards, inputs */
-  --yt-line: #303030;
-  /* borders, dividers */
-  --yt-text: #f1f1f1;
-  /* primary text */
-  --yt-sub: #aaaaaa;
-  /* secondary text */
-  --yt-accent: #ff3b3b;
-  /* play/red accent */
-  --yt-radius: 8px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
 body,
 #root {
-  background: var(--yt-bg);
-  color: var(--yt-text);
+  height: 100%;
 }
 
-/* Container width similar to YT content column */
-.bf-container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 72px 16px 32px;
-  /* header is sticky; add top padding */
+body {
+  margin: 0;
+  background-color: #0f0f0f;
+  color: #fff;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
 }
 
-/* Sticky header like YT */
+/* ===== Header ===== */
 .bf-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--yt-header);
-  display: grid;
-  grid-template-columns: 220px minmax(360px, 680px) 1fr;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--yt-line);
-}
-
-/* Logo left */
-.bf-logo {
-  font-weight: 700;
-  font-size: 18px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  background: rgba(13, 13, 15, 0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 
-/* Center search: input + icon button */
+/* Left cluster: hamburger + logo */
+.bf-leftCluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bf-hamburger {
+  font-size: 1.3rem;
+  background: none;
+  border: 1px solid #2f3240;
+  color: inherit;
+  padding: 5px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.bf-hamburger:hover {
+  background: #1b1c23;
+  border-color: #3a3d4f;
+}
+
+.bf-logoGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+}
+
+.bf-logoIcon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.bf-logoText {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* Center: search */
 .bf-searchWrap {
-  display: grid;
-  grid-template-columns: 1fr 44px;
-  gap: 0;
+  position: relative;
+  flex: 1;
+  max-width: 480px;
+  margin: 0 10px;
 }
 
 .bf-search {
   width: 100%;
-  background: var(--yt-bg);
-  color: var(--yt-text);
-  border: 1px solid var(--yt-line);
-  border-right: none;
-  border-radius: var(--yt-radius) 0 0 var(--yt-radius);
-  padding: 10px 12px;
-  font-size: 14px;
+  padding: 9px 36px 9px 14px;
+  border-radius: 22px;
+  border: 1px solid #2f3240;
+  background: #1a1b21;
+  color: #f5f5f5;
+  font-size: 0.95rem;
   outline: none;
+  transition: all 0.25s ease;
 }
 
 .bf-search::placeholder {
-  color: var(--yt-sub);
+  color: #777;
 }
 
-.bf-searchBtn {
-  border: 1px solid var(--yt-line);
-  border-radius: 0 var(--yt-radius) var(--yt-radius) 0;
-  background: #222;
-  color: var(--yt-text);
-  cursor: pointer;
+.bf-search:focus {
+  border-color: #e50914;
+  box-shadow: 0 0 8px rgba(229, 9, 20, 0.4);
 }
 
-/* Right: Library/Favorites + Admin */
+.bf-searchIcon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #aaa;
+  pointer-events: none;
+}
+
+/* Right: header actions */
 .bf-actions {
-  justify-self: end;
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.bf-viewToggle {
-  display: flex;
   gap: 8px;
 }
 
 .bf-navBtn {
-  background: transparent;
-  border: 1px solid var(--yt-line);
-  color: var(--yt-text);
-  padding: 6px 12px;
-  border-radius: var(--yt-radius);
-  font-weight: 600;
-  transition: background .15s ease, color .15s ease, border-color .15s ease;
+  background: #20222a;
+  border: 1px solid #2f3240;
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
-.bf-navBtn:hover {
-  background: #1a1a1a;
-  border-color: #3a3a3a;
-}
-
+.bf-navBtn:hover,
 .bf-navBtn.is-active {
-  background: #2a2a2a;
-  border-color: #3a3a3a;
+  background: #e50914;
+  border-color: #e50914;
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.5);
 }
 
-/* Continue Watching strip (horizontal) */
-.bf-cont {
-  margin: 14px 0 12px;
+/* ===== Drawer (hamburger menu) ===== */
+.bf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+  z-index: 1999;
 }
 
-.bf-contHeader {
+.bf-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bf-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100dvh;
+  width: 260px;
+  background: #0f0f10;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(-100%);
+  transition: transform 240ms cubic-bezier(.2, .7, .2, 1);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 6px;
+}
+
+.bf-drawer.open {
+  transform: translateX(0);
+}
+
+.bf-drawerHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
-.bf-hl {
-  font-weight: 700;
+.bf-drawerTitle {
+  font-weight: 600;
 }
 
-.favs-scroll {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.bf-contCard {
-  position: relative;
-  min-width: 300px;
-  max-width: 360px;
-  background: transparent;
-  /* YT thumbs float; metadata below */
+.bf-drawerClose {
+  background: none;
   border: none;
-}
-
-.bf-cardClear {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: rgba(0, 0, 0, .6);
-  color: #eee;
-  border: 1px solid rgba(255, 255, 255, .15);
-  border-radius: 12px;
-  padding: 2px 8px;
+  color: inherit;
+  font-size: 1.2rem;
   cursor: pointer;
 }
 
-.bf-favThumbWrap {
-  aspect-ratio: 16/9;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #000;
+.bf-drawerList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-.bf-favThumb {
+.bf-drawerItem {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #eaeaea;
+  text-align: left;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 160ms ease;
 }
 
-.bf-favMeta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 2px;
+.bf-drawerItem:hover,
+.bf-drawerItem.is-active {
+  background: #1a1b22;
 }
 
-.bf-favTitle {
-  font-weight: 600;
-  color: var(--yt-text);
+.bf-drawerSep {
+  border: none;
+  border-top: 1px solid #262836;
+  margin: 8px 0;
 }
 
-/* Grid like YT: 4 columns down to 3/2/1 responsively */
+/* ===== Layout container ===== */
+.bf-container {
+  width: 100vw;
+  max-width: 100vw;
+  padding: 0;
+  margin: 0 auto;
+}
+
+/* ===== GRID: exactly 4 across on desktop ===== */
 .bf-grid {
   display: grid;
-  gap: 16px 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* FOUR columns */
+  gap: 12px;
+  padding: 20px 24px 60px;
+  margin: 0 auto;
+  justify-content: center;
+  align-items: start;
+  max-width: 1600px;
 }
 
+/* Fallbacks for narrower screens */
 @media (max-width: 1200px) {
   .bf-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 820px) {
   .bf-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 520px) {
   .bf-grid {
     grid-template-columns: 1fr;
   }
 }
 
-/* Cards: flat, no heavy glow */
+/* ===== CARD ===== */
 .bf-card {
-  background: transparent;
-  /* YT uses transparent card with thumb panel */
-  border: none;
-  max-width: 100%;
-}
-
-.bf-thumbWrap {
-  aspect-ratio: 16/9;
+  background: #121218;
+  border: 1px solid #2f3240;
+  border-radius: 10px;
   overflow: hidden;
-  border-radius: 12px;
-  background: #000;
-  position: relative;
-  cursor: pointer;
+  width: 100%;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  transform: translateY(0);
+  transition: all 0.3s ease;
 }
 
-.bf-thumb {
+.bf-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6);
+}
+
+/* Thumbnail (compact) */
+.bf-thumbWrap {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  overflow: hidden;
+  background: #000;
+}
+
+.bf-thumbWrap img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.5s ease;
 }
 
-.bf-badge {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  background: rgba(0, 0, 0, .7);
-  color: #eee;
-  border: 1px solid rgba(255, 255, 255, .2);
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 12px;
+.bf-card:hover .bf-thumbWrap img {
+  transform: scale(1.05);
 }
 
-/* Meta below thumb like YT: title on two lines, actions on the right */
-.bf-cardBody {
-  padding: 8px 2px 0;
-}
-
-.bf-titleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.bf-cardTitle {
-  font-weight: 700;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  /* two-line title like YT */
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.bf-titleActions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.bf-favBtn {
-  background: transparent;
-  border: 1px solid var(--yt-line);
-  color: #fff;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-}
-
-.bf-favBtn.is-active {
-  background: var(--yt-accent);
-  border-color: var(--yt-accent);
-}
-
+/* Meta */
 .bf-meta {
-  color: var(--yt-sub);
-  font-size: 12.5px;
-  margin: 4px 0 8px;
-}
-
-/* Watch button: lean (outlined) */
-.bf-watchBtn {
-  width: auto;
-  padding: 6px 12px;
-  background: transparent;
-  color: var(--yt-text);
-  border: 1px solid var(--yt-line);
-  border-radius: 999px;
-  font-weight: 700;
-  letter-spacing: .2px;
-}
-
-.bf-watchBtn:hover {
-  border-color: #3a3a3a;
-  background: #1a1a1a;
-}
-
-/* Empty state */
-.bf-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: var(--yt-sub);
-  padding: 24px 8px;
-  border: 1px dashed var(--yt-line);
-  border-radius: 12px;
-}
-
-/* Player overlay: keep minimal */
-.bf-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 1000;
-}
-
-.bf-player {
-  width: min(1280px, 96vw);
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--yt-line);
-}
-
-.bf-video {
-  width: 100%;
-  height: auto;
-  background: #000;
-}
-
-.bf-playerBar {
+  padding: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-top: 1px solid var(--yt-line);
-  background: #111;
+  gap: 6px;
+  background: #14151c;
 }
 
-.bf-close {
-  background: transparent;
-  border: 1px solid var(--yt-line);
-  color: #ddd;
-  padding: 6px 10px;
-  border-radius: 8px;
+.bf-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e3e3e3;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Buttons */
+.bf-watchBtn {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #e50914;
+  color: #fff;
+  background: #e50914;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.8rem;
+  transition: background 0.3s ease, transform 0.2s ease;
   cursor: pointer;
 }
 
-.bf-close:hover {
-  background: #1a1a1a;
+.bf-watchBtn:hover {
+  background: #f6121d;
+  transform: translateY(-1px);
+}
+
+/* ===== Misc ===== */
+.bf-empty {
+  text-align: center;
+  color: #9aa0a6;
+  grid-column: 1 / -1;
+  padding: 20px 0 60px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2f3240;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f4252;
+}
+
+/* Ensure no element forces columns wider */
+.bf-card,
+.bf-meta,
+.bf-title {
+  min-width: 0;
 }

@@ -1,101 +1,80 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 
 export default function AdminUnlockModal({ onClose, onSubmit, onForgot }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
-  const overlayRef = useRef(null);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    function onKey(e) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  function handleOverlayClick(e) {
-    if (e.target === overlayRef.current) onClose();
-  }
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const ok = await onSubmit(pin.trim());
-    if (!ok) {
-      setError("Incorrect PIN. Try again.");
-      setPin("");
-      inputRef.current?.focus();
-      return;
+    setError("");
+    setLoading(true);
+    try {
+      const ok = await onSubmit(pin);
+      if (!ok) setError("Incorrect PIN. Please try again.");
+      else onClose();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
     }
-    onClose();
   }
 
   return (
-    <div
-      ref={overlayRef}
-      className='bf-modalOverlay'
-      role='dialog'
-      aria-modal='true'
-      aria-labelledby='bf-adminunlock-title'
-      onClick={handleOverlayClick}
-    >
-      <div className='bf-modal'>
-        <header className='bf-modalHeader'>
-          <h2 id='bf-adminunlock-title' className='bf-modalTitle'>
-            🔓 Admin Unlock
-          </h2>
-          <button className='bf-close' onClick={onClose} aria-label='Close'>
-            ✕
-          </button>
-        </header>
+    <div className='bf-modalOverlay' onClick={onClose}>
+      <div
+        className='bf-modal glassy'
+        onClick={(e) => e.stopPropagation()}
+        role='dialog'
+        aria-modal='true'
+      >
+        <div className='bf-modalHeader'>
+          <h2 className='bf-modalTitle'>🔐 Admin Unlock</h2>
+        </div>
 
-        <form className='bf-modalBody' onSubmit={handleSubmit}>
-          <div className='bf-field'>
-            <label className='bf-label'>Enter PIN</label>
-            <input
-              ref={inputRef}
-              className='bf-input'
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder='••••'
-              type='password'
-              inputMode='numeric'
-              pattern='[0-9]*'
-              required
-            />
-            {error ? <p className='bf-error'>{error}</p> : null}
-          </div>
+        <form onSubmit={handleSubmit} className='bf-modalBody'>
+          <p className='bf-modalText'>
+            Enter your 4-digit admin PIN to unlock access.
+          </p>
 
-          <div
-            className='bf-actionsRow'
-            style={{
-              justifyContent: "space-between",
-              alignItems: "center",
-              width: "100%",
-            }}
-          >
+          <input
+            type='password'
+            maxLength={8}
+            inputMode='numeric'
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder='Enter PIN'
+            className='bf-input'
+            autoFocus
+          />
+
+          {error && <div className='bf-error'>{error}</div>}
+
+          <div className='bf-modalActions'>
+            <button
+              type='submit'
+              className='bf-btn bf-btn--primary'
+              disabled={loading || !pin}
+            >
+              {loading ? "Verifying..." : "Unlock"}
+            </button>
             <button
               type='button'
-              className='bf-linkLike'
-              onClick={() => onForgot && onForgot()}
+              className='bf-btn bf-btn--ghost'
+              onClick={onClose}
             >
-              Forgot PIN?
+              Cancel
             </button>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type='button'
-                className='bf-btn bf-btn--lock'
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-              <button type='submit' className='bf-btn bf-btn--add'>
-                Unlock
-              </button>
-            </div>
           </div>
+
+          <button
+            type='button'
+            className='bf-forgotLink'
+            onClick={onForgot}
+            tabIndex={0}
+          >
+            Forgot PIN?
+          </button>
         </form>
       </div>
     </div>

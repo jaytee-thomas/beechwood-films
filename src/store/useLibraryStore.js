@@ -1,122 +1,70 @@
 import { create } from "zustand";
 
 const KEY = "bf_videos_v1";
-const PROGRESS_KEY = "bf_progress_v1"; // { [videoId]: { t: seconds, updatedAt: epoch_ms } }
+
+const defaultVideos = [
+  {
+    id: 1,
+    title: "Harlem Dancers",
+    thumbnail: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e",
+    duration: "10:21",
+  },
+  {
+    id: 2,
+    title: "South Side Stories",
+    thumbnail: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
+    duration: "22:05",
+  },
+  {
+    id: 3,
+    title: "Lakefront",
+    thumbnail: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+    duration: "14:47",
+  },
+  {
+    id: 4,
+    title: "Echoes of the City",
+    thumbnail: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29",
+    duration: "18:12",
+  },
+  {
+    id: 5,
+    title: "Desert Mirage",
+    thumbnail: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
+    duration: "09:58",
+  },
+  {
+    id: 6,
+    title: "Midnight Roads",
+    thumbnail: "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
+    duration: "11:44",
+  },
+];
 
 function loadVideos() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  const seed = [
-    {
-      id: 1,
-      title: "Harlem Dancers",
-      thumbnail: "https://picsum.photos/seed/harlem/800/450",
-      src: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      duration: "10:21",
-      tags: ["dance", "short"],
-      favorite: false,
-    },
-    {
-      id: 2,
-      title: "South Side Stories",
-      thumbnail: "https://picsum.photos/seed/southside/800/450",
-      src: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-      duration: "22:05",
-      tags: ["doc", "community"],
-      favorite: false,
-    },
-    {
-      id: 3,
-      title: "Lakefront",
-      thumbnail: "https://picsum.photos/seed/lakefront/800/450",
-      src: "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-      duration: "14:47",
-      tags: ["doc", "short"],
-      favorite: false,
-    },
-  ];
-  try { localStorage.setItem(KEY, JSON.stringify(seed)); } catch {}
-  return seed;
+  const stored = localStorage.getItem(KEY);
+  return stored ? JSON.parse(stored) : defaultVideos;
 }
 
 function saveVideos(videos) {
-  try { localStorage.setItem(KEY, JSON.stringify(videos)); } catch {}
-}
-
-function loadProgress() {
-  try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {};
-}
-
-function saveProgress(progress) {
-  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch {}
+  localStorage.setItem(KEY, JSON.stringify(videos));
 }
 
 const useLibraryStore = create((set, get) => ({
   videos: loadVideos(),
-  progress: loadProgress(), // { [id]: { t, updatedAt } }
-
-  addVideo: (video) => {
-    const next = { id: Date.now(), favorite: false, ...video };
-    const videos = [...get().videos, next];
-    saveVideos(videos);
-    set({ videos });
-  },
-
-  updateVideo: (id, updates) => {
-    const videos = get().videos.map((v) =>
-      v.id === id ? { ...v, ...updates } : v
-    );
-    saveVideos(videos);
-    set({ videos });
-  },
-
-  removeVideo: (id) => {
-    const videos = get().videos.filter((v) => v.id !== id);
-    // also clear progress for removed video
-    const progress = { ...get().progress };
-    delete progress[id];
-    saveVideos(videos);
-    saveProgress(progress);
-    set({ videos, progress });
-  },
+  favorites: [],
+  progress: {},
 
   toggleFavorite: (id) => {
-    const videos = get().videos.map((v) =>
-      v.id === id ? { ...v, favorite: !v.favorite } : v
-    );
-    saveVideos(videos);
-    set({ videos });
-    },
-  clearFavorites: () => {
-  const videos = get().videos.map((v) => ({ ...v, favorite: false }));
-  // keep progress intact
-  try { localStorage.setItem("bf_videos_v1", JSON.stringify(videos)); } catch {}
-  set({ videos });
-},
-  // ---- Continue Watching actions ----
-  setProgress: (id, seconds) => {
-    const p = { ...get().progress, [id]: { t: Math.max(0, Math.floor(seconds)), updatedAt: Date.now() } };
-    saveProgress(p);
-    set({ progress: p });
+    const { favorites } = get();
+    const updated = favorites.includes(id)
+      ? favorites.filter((f) => f !== id)
+      : [...favorites, id];
+    set({ favorites: updated });
   },
 
-  clearProgress: (id) => {
-    const p = { ...get().progress };
-    delete p[id];
-    saveProgress(p);
-    set({ progress: p });
-  },
-
-  clearAllProgress: () => {
-    saveProgress({});
-    set({ progress: {} });
-  },
+  setProgress: (progress) => set({ progress }),
+  clearProgress: () => set({ progress: {} }),
 }));
 
 export default useLibraryStore;
