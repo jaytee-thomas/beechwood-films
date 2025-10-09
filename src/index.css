@@ -912,3 +912,653 @@ body {
   letter-spacing: .2px;
   opacity: .95;
 }
+
+/* ===== Continue watching section ===== */
+.bf-continue {
+  margin-top: 20px;
+}
+
+/* Thin progress bar on thumbnail bottom */
+.bf-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.bf-progressFill {
+  height: 100%;
+  background: #e50914;
+  transition: width .25s ease;
+}
+
+/* === Hover preview stacking & click-through === */
+.bf-thumbWrap {
+  position: relative;
+}
+
+.bf-thumbWrap img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.bf-previewLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* IMPORTANT: don't block card clicks */
+  overflow: hidden;
+}
+
+.bf-previewVideo,
+.bf-previewFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+}
+
+/* === Card favorite badge (top-right) === */
+.bf-card {
+  position: relative;
+}
+
+.bf-favBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffffaa;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .18s ease, transform .18s ease, background .2s ease, color .2s ease, border-color .2s ease;
+  pointer-events: auto;
+  /* clickable while preview layer is pointer-events:none */
+}
+
+.bf-card:hover .bf-favBadge {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bf-favBadge:hover {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.bf-favBadge.is-on {
+  background: #e50914;
+  border-color: #e50914;
+  color: #fff;
+}
+
+/* === Bottom meta overlay: lower third === */
+.bf-metaOverlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  /* stick to bottom */
+  height: 34%;
+  min-height: 64px;
+  z-index: 2;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.55), transparent);
+  color: #eaeaea;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  gap: 6px;
+  pointer-events: none;
+  /* keep card click working */
+}
+
+.bf-metaOverlay * {
+  pointer-events: none;
+  /* allow heart/badge to remain clickable */
+}
+
+.bf-metaTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bf-metaSub {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+
+/* Ensure preview layer stacks correctly and doesn't block clicks */
+.bf-thumbWrap {
+  position: relative;
+}
+
+.bf-thumbWrap img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.bf-previewLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bf-previewVideo,
+.bf-previewFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+}
+
+/* === YouTube-like hero grid (3 across) === */
+.bf-grid.yt-hero {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  width: 100%;
+  max-width: 1400px;
+  /* roomy like YT */
+  margin: 20px auto 60px;
+  padding: 0 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .bf-grid.yt-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .bf-grid.yt-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === Card === */
+.yt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.yt-thumb {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  /* exact 16:9 like YT hero */
+  background: #000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transform: translateY(0);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.yt-card:hover .yt-thumb {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.55);
+}
+
+.yt-thumb>img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+/* Hover preview sits above, doesn't block click */
+.yt-previewLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.yt-previewVideo,
+.yt-previewFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+}
+
+/* Favorite heart in top-right */
+.yt-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .16s ease, transform .16s ease, background .2s ease, border-color .2s ease;
+  pointer-events: auto;
+}
+
+.yt-card:hover .yt-fav {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.yt-fav:hover {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.yt-fav.is-on {
+  background: #e50914;
+  border-color: #e50914;
+}
+
+/* Info under thumbnail */
+.yt-info {
+  padding: 0 2px;
+}
+
+.yt-title {
+  font-weight: 700;
+  color: #e9e9e9;
+  font-size: 1.02rem;
+  line-height: 1.25rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  /* 2 lines like YT */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.yt-sub {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: #a7a7a7;
+}
+
+/* Admin mini row */
+.yt-adminRow {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.yt-adminBtn {
+  background: #20222a;
+  border: 1px solid #2f3240;
+  color: #eaeaea;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.yt-adminBtn:hover {
+  background: #2a6df1;
+  border-color: #2a6df1;
+}
+
+.yt-adminBtn.danger:hover {
+  background: #e50914;
+  border-color: #e50914;
+}
+
+/* === Favorite Star Styling === */
+.yt-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    background 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease;
+  pointer-events: auto;
+}
+
+.yt-card:hover .yt-fav {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.yt-fav:hover {
+  background: rgba(0, 0, 0, 0.75);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
+}
+
+/* Active “favorite” state */
+.yt-fav.is-on {
+  background: radial-gradient(circle at 30% 30%, #ffdc73, #f7b900 80%);
+  border: 1px solid #f7b900;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+}
+
+/* SVG color control */
+.yt-favIcon {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.yt-fav:hover .yt-favIcon {
+  transform: scale(1.1);
+}
+
+.yt-fav.is-on .yt-favIcon {
+  color: #fff8c2;
+  filter: drop-shadow(0 0 6px rgba(255, 220, 80, 0.7));
+}
+
+/* === Cinematic Star Favorite Button === */
+.yt-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #1a1a1a, #000);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffcc4d;
+  /* gold base */
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+/* Show star when hovering card */
+.yt-card:hover .yt-fav {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Default hover shine */
+.yt-fav:hover {
+  background: radial-gradient(circle at 40% 40%, #222, #000 80%);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.45);
+}
+
+/* Metallic gold gradient on star */
+.yt-favIcon {
+  transition: transform 0.2s ease, color 0.25s ease;
+  background: linear-gradient(145deg,
+      #ffe98a 10%,
+      #f7ca1f 40%,
+      #d29f00 60%,
+      #fff4c3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 2px rgba(255, 200, 0, 0.3));
+}
+
+.yt-fav:hover .yt-favIcon {
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 6px rgba(255, 220, 80, 0.6));
+}
+
+/* === Active (clicked/favorited) state === */
+.yt-fav.is-on {
+  background: radial-gradient(circle at 30% 30%, #6a0000, #e50914 70%);
+  border-color: #e50914;
+  box-shadow: 0 0 12px rgba(229, 9, 20, 0.7);
+  color: #fff;
+}
+
+.yt-fav.is-on .yt-favIcon {
+  background: linear-gradient(145deg,
+      #ffb3b3 5%,
+      #ff2a2a 35%,
+      #d60000 60%,
+      #ff5555 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.7));
+  transform: scale(1.15);
+}
+
+/* === Click pulse + sparkle for favorite star === */
+@keyframes favPulse {
+  0% {
+    transform: translateY(0) scale(0.92);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+
+  45% {
+    transform: translateY(0) scale(1.18);
+    box-shadow: 0 0 16px rgba(229, 9, 20, 0.6);
+  }
+
+  100% {
+    transform: translateY(0) scale(1.0);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+@keyframes favSpark {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6) rotate(0deg);
+    opacity: 0.9;
+  }
+
+  60% {
+    transform: translate(-50%, -50%) scale(1.15) rotate(25deg);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1.4) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+/* Pulse the button container */
+.yt-fav.pulse {
+  animation: favPulse 420ms cubic-bezier(.2, .9, .2, 1) both;
+}
+
+/* Sparkle burst using a pseudo-element; renders above the star briefly */
+.yt-fav.pulse::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  border-radius: 999px;
+  /* multi-stop radial gives a nice sparkle ring */
+  background:
+    radial-gradient(circle at 50% 50%,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.65) 12%,
+      rgba(255, 255, 255, 0.0) 40%),
+    conic-gradient(from 0deg,
+      rgba(255, 255, 255, 0.9) 0deg,
+      rgba(255, 215, 0, 0.9) 20deg,
+      rgba(255, 0, 0, 0.9) 40deg,
+      rgba(255, 0, 0, 0.0) 360deg);
+  mix-blend-mode: screen;
+  filter: blur(0.3px);
+  transform: translate(-50%, -50%);
+  animation: favSpark 420ms ease-out forwards;
+  z-index: 4;
+}
+
+/* Keep it pretty in both states */
+.yt-fav.is-on.pulse {
+  box-shadow: 0 0 16px rgba(229, 9, 20, 0.75);
+}
+
+.yt-fav.is-on.pulse .yt-favIcon {
+  filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.7));
+}
+
+/* === Hover: make star fully white === */
+.yt-fav:hover .yt-favIcon {
+  background: none !important;
+  /* remove gradient */
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: #fff !important;
+  color: #fff !important;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) !important;
+  transform: scale(1.12);
+}
+
+/* === Modern Star Color Logic === */
+
+/* Base: idle metallic blue (visible when hovered or active) */
+.yt-favIcon {
+  transition:
+    transform 0.3s ease,
+    color 0.35s ease,
+    opacity 0.35s ease,
+    filter 0.35s ease,
+    background 0.35s ease,
+    -webkit-text-fill-color 0.35s ease;
+  background: linear-gradient(145deg, #a0c4ff 10%, #3b82f6 40%, #1e40af 80%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+  opacity: 0;
+  /* invisible by default */
+}
+
+/* Hover on card: star appears & turns pure white */
+.yt-card:hover .yt-favIcon {
+  opacity: 1;
+  background: none;
+  -webkit-text-fill-color: #ffffff;
+  color: #ffffff;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.85));
+  transform: scale(1.12);
+}
+
+/* Active (favorited): visible vivid red star, stays visible */
+.yt-fav.is-on .yt-favIcon {
+  opacity: 1 !important;
+  background: linear-gradient(145deg, #ffb3b3 5%, #ff2a2a 35%, #d60000 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.8));
+  transform: scale(1.1);
+}
+
+/* Smooth visibility fade for the container too */
+.yt-fav {
+  transition: opacity 0.35s ease, transform 0.3s ease;
+  opacity: 0;
+}
+
+.yt-card:hover .yt-fav,
+.yt-fav.is-on {
+  opacity: 1;
+}
+
+/* === Active red star: gentle pulsing glow === */
+@keyframes redStarPulse {
+  0% {
+    filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.55));
+    transform: scale(1.08);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 12px rgba(255, 0, 0, 0.9));
+    transform: scale(1.12);
+  }
+
+  100% {
+    filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.55));
+    transform: scale(1.08);
+  }
+}
+
+@keyframes redRingPulse {
+  0% {
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.45);
+  }
+
+  50% {
+    box-shadow: 0 0 16px rgba(229, 9, 20, 0.85);
+  }
+
+  100% {
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.45);
+  }
+}
+
+/* Keep red while hovering even if card hover would normally swap to white */
+.yt-fav.is-on .yt-favIcon,
+.yt-card:hover .yt-fav.is-on .yt-favIcon {
+  animation: redStarPulse 2.4s ease-in-out infinite;
+}
+
+/* Subtle ring pulse on the button background when active */
+.yt-fav.is-on,
+.yt-card:hover .yt-fav.is-on {
+  animation: redRingPulse 2.4s ease-in-out infinite;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+
+  .yt-fav.is-on,
+  .yt-fav.is-on .yt-favIcon {
+    animation: none !important;
+  }
+}

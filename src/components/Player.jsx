@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import useLibraryStore from "../store/useLibraryStore";
 import useAdmin from "../store/useAdmin";
@@ -7,17 +7,27 @@ import Header from "./Header";
 export default function Player() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { videos, favorites, toggleFavorite } = useLibraryStore();
+  const {
+    videos,
+    favorites,
+    toggleFavorite,
+    progress,
+    durations,
+    setProgress,
+    clearProgress,
+    setDuration,
+    recordWatch,
+  } = useLibraryStore();
   const { isAdmin, login, logout } = useAdmin();
 
-  // header states (kept for consistency)
+  // header states
   const [search, setSearch] = useState("");
   const [view, setView] = useState("library");
 
-  // left-rail section state (just visual consistency)
-  const [section, setSection] = useState("home"); // home | shorts | you
+  // left rail section
+  const [section, setSection] = useState("home");
 
-  // hover preview state for Up Next cards
+  // hover preview state for rows under the player
   const [previewId, setPreviewId] = useState(null);
 
   const video = useMemo(
@@ -37,7 +47,46 @@ export default function Player() {
   const vimeoSrc =
     isVimeo && video?.embedUrl ? `${video.embedUrl}?autoplay=1` : null;
 
-  // --- Build "Up next" list: prefer same library, then fill with others ---
+  // record that this video was watched (for recency)
+  useEffect(() => {
+    if (video) recordWatch(video.id);
+  }, [video, recordWatch]);
+
+  // --- Save progress for file videos ---
+  const videoRef = useRef(null);
+  const lastSentRef = useRef(0);
+
+  const onLoadedMeta = () => {
+    if (!videoRef.current || !video) return;
+    setDuration(video.id, videoRef.current.duration || 0);
+    // If we have saved progress, resume near that time (+-1s guard)
+    const saved = progress[video.id];
+    if (saved && isFinite(saved)) {
+      try {
+        videoRef.current.currentTime = Math.max(
+          0,
+          Math.min(saved, videoRef.current.duration || saved)
+        );
+      } catch {}
+    }
+  };
+
+  const onTimeUpdate = () => {
+    if (!videoRef.current || !video) return;
+    const now = performance.now();
+    if (now - lastSentRef.current > 1000) {
+      // throttle ~1s
+      lastSentRef.current = now;
+      setProgress(video.id, videoRef.current.currentTime || 0);
+    }
+  };
+
+  const onEnded = () => {
+    if (!video) return;
+    clearProgress(video.id); // finished: remove from Continue list
+  };
+
+  // --- Related (Up next) ---
   const related = useMemo(() => {
     const others = videos.filter((v) => String(v.id) !== String(id));
     if (!video) return others.slice(0, 6);
@@ -52,6 +101,16 @@ export default function Player() {
     );
     return [...sameLib, ...rest].slice(0, 6);
   }, [videos, video, id]);
+
+  // --- Continue watching (exclude current) ---
+  const continueList = useMemo(() => {
+    const ids = Object.keys(progress).map((k) => Number(k));
+    const setIds = new Set(ids);
+    const list = videos
+      .filter((v) => setIds.has(v.id) && String(v.id) !== String(id))
+      .slice(0, 6);
+    return list;
+  }, [videos, progress, id]);
 
   function playVideoById(vid) {
     navigate(`/watch/${vid.id}`);
@@ -68,6 +127,15 @@ export default function Player() {
     return null;
   }
 
+  // progress percent helper for cards
+  const percentFor = (vid) => {
+    const p = progress[vid.id];
+    const d = durations[vid.id];
+    if (!p || !d || d <= 0) return null;
+    const pct = Math.max(0, Math.min(100, Math.round((p / d) * 100)));
+    return pct;
+  };
+
   return (
     <div className='bf-container'>
       {/* Shared header on player page too */}
@@ -80,7 +148,7 @@ export default function Player() {
         onHamburgerClick={() => {}}
       />
 
-      {/* Same two-column layout as Library: left rail + main content */}
+      {/* Same two-column layout as Library */}
       <div className='bf-mainLayout'>
         {/* --- LEFT SIDEBAR (compact) --- */}
         <aside className='bf-sidebar' aria-label='Primary'>
@@ -177,7 +245,7 @@ export default function Player() {
           )}
         </aside>
 
-        {/* --- MAIN PLAYER CONTENT + UP NEXT --- */}
+        {/* --- MAIN: Player + Up Next + Continue Watching --- */}
         <main className='bf-content'>
           <div className='bf-playerWrap' style={{ padding: 0 }}>
             {!video ? (
@@ -206,11 +274,15 @@ export default function Player() {
                 <div className='bf-playerStage'>
                   {isFile && video.embedUrl && (
                     <video
+                      ref={videoRef}
                       className='bf-playerVideo'
                       src={video.embedUrl}
                       autoPlay
                       controls
                       playsInline
+                      onLoadedMetadata={onLoadedMeta}
+                      onTimeUpdate={onTimeUpdate}
+                      onEnded={onEnded}
                     />
                   )}
                   {isYouTube && ytSrc && (
@@ -221,6 +293,10 @@ export default function Player() {
                       allow='autoplay; fullscreen; picture-in-picture'
                       allowFullScreen
                       loading='eager'
+                      // we can't easily track time in plain iframe; mark as started
+                      onLoad={() =>
+                        setProgress(video.id, progress[video.id] || 1)
+                      }
                     />
                   )}
                   {isVimeo && vimeoSrc && (
@@ -231,11 +307,14 @@ export default function Player() {
                       allow='autoplay; fullscreen; picture-in-picture'
                       allowFullScreen
                       loading='eager'
+                      onLoad={() =>
+                        setProgress(video.id, progress[video.id] || 1)
+                      }
                     />
                   )}
                 </div>
 
-                {/* ===== UP NEXT / RELATED ===== */}
+                {/* ===== UP NEXT ===== */}
                 {related.length > 0 && (
                   <section className='bf-upnext'>
                     <h3 className='bf-sectionTitle'>Up next</h3>
@@ -322,6 +401,116 @@ export default function Player() {
                                   }
                                 >
                                   {favorites.includes(v.id) ? "★" : "☆"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {/* ===== CONTINUE WATCHING ===== */}
+                {continueList.length > 0 && (
+                  <section className='bf-continue'>
+                    <h3 className='bf-sectionTitle'>Continue watching</h3>
+                    <div className='bf-grid three-across'>
+                      {continueList.map((v) => {
+                        const active = previewId === v.id;
+                        const preview = getPreviewSrc(v);
+                        const pct = percentFor(v); // null if unknown
+                        return (
+                          <div
+                            key={v.id}
+                            className='bf-card'
+                            onMouseEnter={() => setPreviewId(v.id)}
+                            onMouseLeave={() =>
+                              setPreviewId((pid) => (pid === v.id ? null : pid))
+                            }
+                            onClick={() => playVideoById(v)}
+                            role='button'
+                            tabIndex={0}
+                            onKeyDown={(e) =>
+                              (e.key === "Enter" || e.key === " ") &&
+                              playVideoById(v)
+                            }
+                          >
+                            <div className='bf-thumbWrap'>
+                              <img src={v.thumbnail} alt={v.title} />
+                              {active && (
+                                <div className='bf-previewLayer'>
+                                  {v.provider === "file" && v.embedUrl ? (
+                                    <video
+                                      src={v.embedUrl}
+                                      muted
+                                      playsInline
+                                      autoPlay
+                                      loop
+                                      preload='metadata'
+                                      className='bf-previewVideo'
+                                    />
+                                  ) : preview ? (
+                                    <iframe
+                                      className='bf-previewFrame'
+                                      src={preview}
+                                      title={`${v.title} preview`}
+                                      allow='autoplay; fullscreen; picture-in-picture'
+                                      allowFullScreen={false}
+                                      loading='eager'
+                                    />
+                                  ) : null}
+                                </div>
+                              )}
+
+                              {/* progress bar overlay */}
+                              {pct !== null && (
+                                <div className='bf-progress'>
+                                  <div
+                                    className='bf-progressFill'
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            <div
+                              className='bf-meta'
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className='bf-title' title={v.title}>
+                                {v.title}
+                                {pct !== null && (
+                                  <span
+                                    style={{
+                                      marginLeft: 8,
+                                      fontSize: ".8rem",
+                                      opacity: 0.8,
+                                    }}
+                                  >
+                                    {pct}% watched
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button
+                                  className='bf-watchBtn'
+                                  onClick={() => playVideoById(v)}
+                                >
+                                  ▶ Resume
+                                </button>
+                                <button
+                                  className='bf-watchBtn'
+                                  style={{
+                                    background: "#444",
+                                    borderColor: "#444",
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    clearProgress(v.id);
+                                  }}
+                                >
+                                  ✖ Clear
                                 </button>
                               </div>
                             </div>

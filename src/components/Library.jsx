@@ -6,6 +6,17 @@ import AddVideoModal from "./ui/AddVideoModal";
 import EditVideoModal from "./ui/EditVideoModal";
 import Header from "./Header";
 
+function formatDuration(seconds) {
+  if (!seconds || !isFinite(seconds)) return null;
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0)
+    return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
 export default function Library() {
   const {
     videos,
@@ -14,18 +25,17 @@ export default function Library() {
     addVideo,
     updateVideo,
     removeVideo,
+    durations,
   } = useLibraryStore();
 
   const { isAdmin, login, logout } = useAdmin();
   const navigate = useNavigate();
 
-  // page UI state
   const [search, setSearch] = useState("");
   const [view, setView] = useState("library"); // library | favorites
   const [section, setSection] = useState("home"); // home | shorts | you
   const [previewId, setPreviewId] = useState(null);
 
-  // modals
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editingVideo, setEditingVideo] = useState(null);
@@ -84,17 +94,16 @@ export default function Library() {
   function getPreviewSrc(v) {
     if (v.provider === "youtube" && v.embedUrl) {
       const id = v.providerId || "";
-      return `${v.embedUrl}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}&modestbranding=1&playsinline=1&rel=0&vq=small`;
+      return `${v.embedUrl}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}&modestbranding=1&playsinline=1&rel=0&vq=small&enablejsapi=1`;
     }
     if (v.provider === "vimeo" && v.embedUrl) {
-      return `${v.embedUrl}?autoplay=1&muted=1&loop=1&background=1#t=0s`;
+      return `${v.embedUrl}?autoplay=1&muted=1&loop=1&background=1&autopause=0#t=0s`;
     }
     return null;
   }
 
   return (
     <div className='bf-container'>
-      {/* Shared Header */}
       <Header
         search={search}
         onSearchChange={setSearch}
@@ -104,8 +113,8 @@ export default function Library() {
         onHamburgerClick={() => {}}
       />
 
-      {/* Main: sidebar + grid */}
       <div className='bf-mainLayout'>
+        {/* Left rail (unchanged) */}
         <aside className='bf-sidebar' aria-label='Primary'>
           <button
             className={`bf-sideItem ${section === "home" ? "is-active" : ""}`}
@@ -122,7 +131,6 @@ export default function Library() {
             </span>
             <span className='bf-sideLabel'>Home</span>
           </button>
-
           <button
             className={`bf-sideItem ${section === "shorts" ? "is-active" : ""}`}
             onClick={() => setSection("shorts")}
@@ -138,7 +146,6 @@ export default function Library() {
             </span>
             <span className='bf-sideLabel'>Shorts</span>
           </button>
-
           <button
             className={`bf-sideItem ${section === "you" ? "is-active" : ""}`}
             onClick={() => setSection("you")}
@@ -200,19 +207,29 @@ export default function Library() {
           )}
         </aside>
 
+        {/* ===== GRID (YouTube hero-style 3 across) ===== */}
         <main className='bf-content'>
           {filtered.length === 0 ? (
             <p className='bf-empty'>No videos found</p>
           ) : (
-            <div className='bf-grid three-across'>
+            <div className='bf-grid yt-hero'>
               {filtered.map((video) => {
                 const isPreviewing = previewId === video.id;
                 const ytVmPreview = getPreviewSrc(video);
+                const fav = favorites.includes(video.id);
+                const dur = formatDuration(durations[video.id]);
+                const dateStr = video.date
+                  ? new Date(video.date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : null;
 
                 return (
                   <div
                     key={video.id}
-                    className='bf-card'
+                    className='yt-card'
                     onMouseEnter={() => setPreviewId(video.id)}
                     onMouseLeave={() =>
                       setPreviewId((id) => (id === video.id ? null : id))
@@ -224,10 +241,13 @@ export default function Library() {
                       (e.key === "Enter" || e.key === " ") && playVideo(video)
                     }
                   >
-                    <div className='bf-thumbWrap'>
+                    {/* Thumbnail 16:9 */}
+                    <div className='yt-thumb'>
                       <img src={video.thumbnail} alt={video.title} />
+
+                      {/* Hover preview */}
                       {isPreviewing && (
-                        <div className='bf-previewLayer'>
+                        <div className='yt-previewLayer'>
                           {video.provider === "file" && video.embedUrl ? (
                             <video
                               src={video.embedUrl}
@@ -236,89 +256,86 @@ export default function Library() {
                               autoPlay
                               loop
                               preload='metadata'
-                              className='bf-previewVideo'
+                              className='yt-previewVideo'
                             />
                           ) : ytVmPreview ? (
                             <iframe
-                              className='bf-previewFrame'
+                              className='yt-previewFrame'
                               src={ytVmPreview}
                               title={`${video.title} preview`}
-                              allow='autoplay; fullscreen; picture-in-picture'
+                              allow='autoplay; encrypted-media; fullscreen; picture-in-picture'
                               allowFullScreen={false}
                               loading='eager'
                             />
                           ) : null}
                         </div>
                       )}
+
+                      {/* Favorite heart (hover) */}
+                      {/* Favorite star (hover) */}
+                      <button
+                        className={`yt-fav ${fav ? "is-on" : ""}`}
+                        title={
+                          fav ? "Remove from favorites" : "Add to favorites"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // retrigger CSS animation every click
+                          e.currentTarget.classList.remove("pulse");
+                          // force reflow so the class can re-apply
+                          // (this is the magic line)
+                          // eslint-disable-next-line no-unused-expressions
+                          e.currentTarget.offsetWidth;
+                          e.currentTarget.classList.add("pulse");
+
+                          toggleFavorite(video.id);
+                        }}
+                        aria-label='Toggle favorite'
+                      >
+                        <svg
+                          viewBox='0 0 24 24'
+                          width='18'
+                          height='18'
+                          aria-hidden='true'
+                          className='yt-favIcon'
+                        >
+                          <path
+                            fill='currentColor'
+                            d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'
+                          />
+                        </svg>
+                      </button>
                     </div>
 
+                    {/* Info under thumbnail */}
                     <div
-                      className='bf-meta'
+                      className='yt-info'
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className='bf-title' title={video.title}>
+                      <div className='yt-title' title={video.title}>
                         {video.title}
                       </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          className='bf-watchBtn'
-                          onClick={() => playVideo(video)}
-                        >
-                          ▶ Watch
-                        </button>
-                        <button
-                          className='bf-watchBtn'
-                          style={{
-                            background: favorites.includes(video.id)
-                              ? "#20222a"
-                              : "#e50914",
-                            borderColor: favorites.includes(video.id)
-                              ? "#2f3240"
-                              : "#e50914",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(video.id);
-                          }}
-                          aria-label={
-                            favorites.includes(video.id)
-                              ? "Remove from favorites"
-                              : "Add to favorites"
-                          }
-                        >
-                          {favorites.includes(video.id) ? "★" : "☆"}
-                        </button>
-                        {isAdmin && (
-                          <>
-                            <button
-                              className='bf-watchBtn'
-                              style={{
-                                background: "#2a6df1",
-                                borderColor: "#2a6df1",
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditOpen(video);
-                              }}
-                            >
-                              ✎ Edit
-                            </button>
-                            <button
-                              className='bf-watchBtn'
-                              style={{
-                                background: "#444",
-                                borderColor: "#444",
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(video.id);
-                              }}
-                            >
-                              🗑 Delete
-                            </button>
-                          </>
-                        )}
+                      <div className='yt-sub'>
+                        {dateStr ? dateStr : "—"} • {dur ? dur : "—"}
                       </div>
+
+                      {/* Small admin row (optional) */}
+                      {isAdmin && (
+                        <div className='yt-adminRow'>
+                          <button
+                            className='yt-adminBtn'
+                            onClick={() => handleEditOpen(video)}
+                          >
+                            ✎ Edit
+                          </button>
+                          <button
+                            className='yt-adminBtn danger'
+                            onClick={() => handleDelete(video.id)}
+                          >
+                            🗑 Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
