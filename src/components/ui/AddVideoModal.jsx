@@ -9,101 +9,16 @@ function isHttpUrl(url) {
   }
 }
 
-function parseYouTubeId(url) {
-  // Supports: https://www.youtube.com/watch?v=ID, https://youtu.be/ID, with extra params
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      return u.pathname.replace("/", "");
-    }
-    if (u.hostname.includes("youtube.com")) {
-      if (u.searchParams.get("v")) return u.searchParams.get("v");
-      // Shorts or embed patterns
-      const path = u.pathname.split("/");
-      const idx = path.findIndex((p) => p === "shorts" || p === "embed");
-      if (idx >= 0 && path[idx + 1]) return path[idx + 1];
-    }
-  } catch {}
-  return null;
-}
-
-function parseVimeoId(url) {
-  // Basic: https://vimeo.com/12345678 or /video/12345678
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("vimeo.com")) {
-      const parts = u.pathname.split("/").filter(Boolean);
-      const id = parts.pop();
-      if (id && /^\d+$/.test(id)) return id;
-    }
-  } catch {}
-  return null;
-}
-
-function detectProvider(url) {
-  if (!isHttpUrl(url))
-    return {
-      provider: null,
-      providerId: null,
-      embedUrl: null,
-      defaultThumb: null,
-      kind: "invalid",
-    };
-
+function looksLikeVideoUrl(url) {
+  if (!isHttpUrl(url)) return false;
   const lower = url.toLowerCase();
-
-  const yt = parseYouTubeId(url);
-  if (yt) {
-    return {
-      provider: "youtube",
-      providerId: yt,
-      embedUrl: `https://www.youtube.com/embed/${yt}`,
-      defaultThumb: `https://img.youtube.com/vi/${yt}/hqdefault.jpg`,
-      kind: "stream",
-    };
-  }
-
-  const vm = parseVimeoId(url);
-  if (vm) {
-    return {
-      provider: "vimeo",
-      providerId: vm,
-      embedUrl: `https://player.vimeo.com/video/${vm}`,
-      defaultThumb: null, // Vimeo requires API for thumbs; leave null
-      kind: "stream",
-    };
-  }
-
-  // direct file?
-  const isFile = [".mp4", ".mov", ".webm", ".m3u8"].some((ext) =>
+  const fileExt = [".mp4", ".mov", ".webm", ".m3u8"].some((ext) =>
     lower.includes(ext)
   );
-  if (isFile) {
-    return {
-      provider: "file",
-      providerId: null,
-      embedUrl: url,
-      defaultThumb: null,
-      kind: "file",
-    };
-  }
-
-  return {
-    provider: null,
-    providerId: null,
-    embedUrl: null,
-    defaultThumb: null,
-    kind: "unknown",
-  };
-}
-
-function looksLikeVideoUrl(url) {
-  const info = detectProvider(url);
-  return (
-    info.provider === "youtube" ||
-    info.provider === "vimeo" ||
-    info.provider === "file"
-  );
+  const isYouTube =
+    lower.includes("youtube.com/watch") || lower.includes("youtu.be/");
+  const isVimeo = lower.includes("vimeo.com/");
+  return fileExt || isYouTube || isVimeo;
 }
 
 export default function AddVideoModal({ open, onClose, onSave }) {
@@ -118,8 +33,6 @@ export default function AddVideoModal({ open, onClose, onSave }) {
     thumbnail: false,
     videoUrl: false,
   });
-
-  const info = useMemo(() => detectProvider(videoUrl.trim()), [videoUrl]);
 
   useEffect(() => {
     if (open) {
@@ -154,18 +67,11 @@ export default function AddVideoModal({ open, onClose, onSave }) {
   function handleSubmit(e) {
     e.preventDefault();
     if (hasErrors) return;
-
-    // If YouTube and no thumbnail provided, auto-fill
-    const finalThumb = thumbnail.trim() || info.defaultThumb || "";
-
     onSave({
       title: title.trim(),
-      thumbnail: finalThumb,
+      thumbnail: thumbnail.trim(),
       duration: duration.trim(),
       videoUrl: videoUrl.trim(),
-      provider: info.provider, // "youtube" | "vimeo" | "file" | null
-      providerId: info.providerId, // e.g., YouTube ID
-      embedUrl: info.embedUrl, // ready for iframe or player
     });
   }
 
@@ -214,11 +120,7 @@ export default function AddVideoModal({ open, onClose, onSave }) {
                 setPreviewOk(false);
               }}
               onBlur={() => setTouched((t) => ({ ...t, thumbnail: true }))}
-              placeholder={
-                info.provider === "youtube" && !thumbnail
-                  ? `(will use YouTube thumbnail automatically)`
-                  : "https://…"
-              }
+              placeholder='https://…'
               aria-invalid={!!errors.thumbnail}
             />
             {thumbnail ? (
@@ -234,9 +136,7 @@ export default function AddVideoModal({ open, onClose, onSave }) {
             ) : (
               <div className='bf-thumbPreviewWrap'>
                 <div className='bf-thumbPreview bf-thumbPreview--placeholder'>
-                  {info.provider === "youtube"
-                    ? "YouTube detected — we’ll auto-use the official thumbnail if you leave this blank."
-                    : "Paste a thumbnail URL to preview"}
+                  Paste a thumbnail URL to preview
                 </div>
               </div>
             )}
@@ -271,31 +171,6 @@ export default function AddVideoModal({ open, onClose, onSave }) {
             />
             {touched.videoUrl && errors.videoUrl && (
               <div className='bf-error'>{errors.videoUrl}</div>
-            )}
-            {/* Provider badge */}
-            {videoUrl.trim() && (
-              <div className='bf-providerBadge'>
-                {info.provider === "youtube" && (
-                  <>
-                    Detected: <b>YouTube</b> (ID: {info.providerId})
-                  </>
-                )}
-                {info.provider === "vimeo" && (
-                  <>
-                    Detected: <b>Vimeo</b> (ID: {info.providerId})
-                  </>
-                )}
-                {info.provider === "file" && (
-                  <>
-                    Detected: <b>Direct File</b>
-                  </>
-                )}
-                {info.provider === null && (
-                  <>
-                    Provider: <b>Unknown</b>
-                  </>
-                )}
-              </div>
             )}
           </label>
 

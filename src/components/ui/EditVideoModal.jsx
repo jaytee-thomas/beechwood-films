@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 function isHttpUrl(url) {
   try {
@@ -10,7 +10,6 @@ function isHttpUrl(url) {
 }
 
 function parseYouTubeId(url) {
-  // Supports: https://www.youtube.com/watch?v=ID, https://youtu.be/ID, with extra params
   try {
     const u = new URL(url);
     if (u.hostname.includes("youtu.be")) {
@@ -18,7 +17,6 @@ function parseYouTubeId(url) {
     }
     if (u.hostname.includes("youtube.com")) {
       if (u.searchParams.get("v")) return u.searchParams.get("v");
-      // Shorts or embed patterns
       const path = u.pathname.split("/");
       const idx = path.findIndex((p) => p === "shorts" || p === "embed");
       if (idx >= 0 && path[idx + 1]) return path[idx + 1];
@@ -28,7 +26,6 @@ function parseYouTubeId(url) {
 }
 
 function parseVimeoId(url) {
-  // Basic: https://vimeo.com/12345678 or /video/12345678
   try {
     const u = new URL(url);
     if (u.hostname.includes("vimeo.com")) {
@@ -69,12 +66,11 @@ function detectProvider(url) {
       provider: "vimeo",
       providerId: vm,
       embedUrl: `https://player.vimeo.com/video/${vm}`,
-      defaultThumb: null, // Vimeo requires API for thumbs; leave null
+      defaultThumb: null,
       kind: "stream",
     };
   }
 
-  // direct file?
   const isFile = [".mp4", ".mov", ".webm", ".m3u8"].some((ext) =>
     lower.includes(ext)
   );
@@ -106,7 +102,7 @@ function looksLikeVideoUrl(url) {
   );
 }
 
-export default function AddVideoModal({ open, onClose, onSave }) {
+export default function EditVideoModal({ open, onClose, onSave, video }) {
   const [title, setTitle] = useState("");
   const [thumbnail, setThumbnail] = useState("");
   const [duration, setDuration] = useState("");
@@ -119,18 +115,18 @@ export default function AddVideoModal({ open, onClose, onSave }) {
     videoUrl: false,
   });
 
-  const info = useMemo(() => detectProvider(videoUrl.trim()), [videoUrl]);
-
   useEffect(() => {
-    if (open) {
-      setTitle("");
-      setThumbnail("");
-      setDuration("");
-      setVideoUrl("");
+    if (open && video) {
+      setTitle(video.title || "");
+      setThumbnail(video.thumbnail || "");
+      setDuration(video.duration || "");
+      setVideoUrl(video.videoUrl || "");
       setPreviewOk(false);
       setTouched({ title: false, thumbnail: false, videoUrl: false });
     }
-  }, [open]);
+  }, [open, video]);
+
+  const info = useMemo(() => detectProvider(videoUrl.trim()), [videoUrl]);
 
   const errors = useMemo(() => {
     const e = {};
@@ -149,23 +145,25 @@ export default function AddVideoModal({ open, onClose, onSave }) {
 
   const hasErrors = Object.keys(errors).length > 0;
 
-  if (!open) return null;
+  if (!open || !video) return null;
 
   function handleSubmit(e) {
     e.preventDefault();
     if (hasErrors) return;
 
-    // If YouTube and no thumbnail provided, auto-fill
     const finalThumb = thumbnail.trim() || info.defaultThumb || "";
 
     onSave({
-      title: title.trim(),
-      thumbnail: finalThumb,
-      duration: duration.trim(),
-      videoUrl: videoUrl.trim(),
-      provider: info.provider, // "youtube" | "vimeo" | "file" | null
-      providerId: info.providerId, // e.g., YouTube ID
-      embedUrl: info.embedUrl, // ready for iframe or player
+      id: video.id,
+      updates: {
+        title: title.trim(),
+        thumbnail: finalThumb,
+        duration: duration.trim(),
+        videoUrl: videoUrl.trim(),
+        provider: info.provider,
+        providerId: info.providerId,
+        embedUrl: info.embedUrl,
+      },
     });
   }
 
@@ -178,7 +176,7 @@ export default function AddVideoModal({ open, onClose, onSave }) {
     >
       <div className='bf-modal' onClick={(e) => e.stopPropagation()}>
         <div className='bf-modalHeader'>
-          <h3>Add Video</h3>
+          <h3>Edit Video</h3>
           <button
             className='bf-modalClose'
             onClick={onClose}
@@ -196,7 +194,6 @@ export default function AddVideoModal({ open, onClose, onSave }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => setTouched((t) => ({ ...t, title: true }))}
-              placeholder='My Documentary'
               aria-invalid={!!errors.title}
             />
             {touched.title && errors.title && (
@@ -214,36 +211,32 @@ export default function AddVideoModal({ open, onClose, onSave }) {
                 setPreviewOk(false);
               }}
               onBlur={() => setTouched((t) => ({ ...t, thumbnail: true }))}
-              placeholder={
-                info.provider === "youtube" && !thumbnail
-                  ? `(will use YouTube thumbnail automatically)`
-                  : "https://…"
-              }
               aria-invalid={!!errors.thumbnail}
             />
-            {thumbnail ? (
-              <div className='bf-thumbPreviewWrap'>
-                <img
-                  className={`bf-thumbPreview ${previewOk ? "is-ok" : ""}`}
-                  src={thumbnail}
-                  alt='Thumbnail preview'
-                  onLoad={() => setPreviewOk(true)}
-                  onError={() => setPreviewOk(false)}
-                />
-              </div>
-            ) : (
-              <div className='bf-thumbPreviewWrap'>
-                <div className='bf-thumbPreview bf-thumbPreview--placeholder'>
-                  {info.provider === "youtube"
-                    ? "YouTube detected — we’ll auto-use the official thumbnail if you leave this blank."
-                    : "Paste a thumbnail URL to preview"}
-                </div>
-              </div>
-            )}
-            {touched.thumbnail && errors.thumbnail && (
-              <div className='bf-error'>{errors.thumbnail}</div>
-            )}
           </label>
+
+          {/* Live Thumbnail Preview */}
+          <div className='bf-thumbPreviewWrap'>
+            {thumbnail ? (
+              <img
+                className={`bf-thumbPreview ${previewOk ? "is-ok" : ""}`}
+                src={thumbnail}
+                alt='Thumbnail preview'
+                onLoad={() => setPreviewOk(true)}
+                onError={() => setPreviewOk(false)}
+              />
+            ) : (
+              <div className='bf-thumbPreview bf-thumbPreview--placeholder'>
+                {info.provider === "youtube"
+                  ? "YouTube detected — we’ll auto-use the official thumbnail if you leave this blank."
+                  : "Paste a thumbnail URL to preview"}
+              </div>
+            )}
+          </div>
+
+          {touched.thumbnail && errors.thumbnail && (
+            <div className='bf-error'>{errors.thumbnail}</div>
+          )}
 
           <div className='bf-help'>
             Recommended aspect ratio ~16:9 (we’ll cover-fit).
@@ -255,7 +248,6 @@ export default function AddVideoModal({ open, onClose, onSave }) {
               className='bf-input'
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              placeholder='12:34'
             />
           </label>
 
