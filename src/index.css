@@ -373,3 +373,39 @@ body {
 .bf-title {
   min-width: 0;
 }
+
+/* FINAL 4-ACROSS LOCK + snug spacing */
+.bf-grid {
+  gap: 12px !important;
+  padding: 16px 16px 48px !important;
+}
+
+.bf-thumbWrap {
+  height: 128px !important;
+}
+
+.bf-card,
+.bf-meta,
+.bf-title {
+  min-width: 0 !important;
+}
+
+/* Ensure container isn't capping width */
+.bf-container {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+}
+
+.bf-container {
+  width: 100vw !important;
+  max-width: 100vw !important;
+}
+/* subtle admin badge look (optional) */
+.bf-actions span {
+  background: rgba(229, 9, 20, 0.12);
+  border: 1px solid rgba(229, 9, 20, 0.35);
+  padding: 4px 8px;
+  border-radius: 999px;
+}

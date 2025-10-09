@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from "react";
 import useLibraryStore from "../store/useLibraryStore";
+import useAdmin from "../store/useAdmin";
 
 export default function Library() {
-  const { videos, favorites, toggleFavorite, progress, setProgress } =
-    useLibraryStore();
+  const {
+    videos,
+    favorites,
+    toggleFavorite,
+    progress,
+    setProgress,
+    addVideo,
+    updateVideo,
+    removeVideo,
+  } = useLibraryStore();
+
+  const { isAdmin, login, logout } = useAdmin();
 
   const [search, setSearch] = useState("");
   const [view, setView] = useState("library");
@@ -28,12 +39,42 @@ export default function Library() {
           v.title.toLowerCase().includes(search.toLowerCase())
         );
 
+  // --- Admin quick actions (prompt-based to keep it simple) ---
+  function handleAddVideo() {
+    if (!isAdmin) return alert("Admin only");
+    const title = prompt("Title?");
+    if (!title) return;
+    const thumbnail = prompt("Thumbnail URL? (https://...)") || "";
+    const duration = prompt("Duration? (e.g., 12:34)") || "";
+    const videoUrl = prompt("Video URL? (mp4, YouTube, etc.)") || "";
+    addVideo({ title, thumbnail, duration, videoUrl });
+    alert("Video added ✅");
+  }
+
+  function handleEditVideo(v) {
+    if (!isAdmin) return alert("Admin only");
+    const title = prompt("New title:", v.title) ?? v.title;
+    const thumbnail = prompt("New thumbnail URL:", v.thumbnail) ?? v.thumbnail;
+    const duration = prompt("New duration:", v.duration ?? "") ?? v.duration;
+    const videoUrl = prompt("New video URL:", v.videoUrl ?? "") ?? v.videoUrl;
+    updateVideo(v.id, { title, thumbnail, duration, videoUrl });
+    alert("Video updated ✅");
+  }
+
+  function handleDeleteVideo(id) {
+    if (!isAdmin) return alert("Admin only");
+    if (confirm("Delete this video? This cannot be undone.")) {
+      removeVideo(id);
+      alert("Video deleted 🗑️");
+    }
+  }
+
   return (
     <div className='bf-container'>
       {/* ===== HEADER (unchanged) ===== */}
       <header className='bf-header'>
         <div className='bf-leftCluster'>
-          {/* Hamburger (unchanged) */}
+          {/* Hamburger */}
           <button
             className='bf-hamburger'
             onClick={() => setDrawerOpen(true)}
@@ -42,7 +83,7 @@ export default function Library() {
             ☰
           </button>
 
-          {/* Logo (unchanged, inherits color) */}
+          {/* Logo */}
           <div className='bf-logoGroup'>
             <svg
               xmlns='http://www.w3.org/2000/svg'
@@ -59,7 +100,7 @@ export default function Library() {
           </div>
         </div>
 
-        {/* Search (unchanged) */}
+        {/* Search */}
         <div className='bf-searchWrap'>
           <input
             type='text'
@@ -73,7 +114,7 @@ export default function Library() {
           </span>
         </div>
 
-        {/* Header actions (unchanged) */}
+        {/* Header actions */}
         <div className='bf-actions'>
           <button
             className={`bf-navBtn ${view === "library" ? "is-active" : ""}`}
@@ -87,10 +128,14 @@ export default function Library() {
           >
             Favorites
           </button>
+          {/* Tiny badge when admin on */}
+          {isAdmin && (
+            <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>Admin On</span>
+          )}
         </div>
       </header>
 
-      {/* ===== DRAWER + OVERLAY (unchanged behavior) ===== */}
+      {/* ===== DRAWER + OVERLAY ===== */}
       {drawerOpen && (
         <div
           className='bf-overlay show'
@@ -146,37 +191,64 @@ export default function Library() {
                 <hr className='bf-drawerSep' />
               </li>
 
-              <li>
-                <button
-                  className='bf-drawerItem'
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    alert("Upload coming soon (admin only).");
-                  }}
-                >
-                  ⬆ Upload Video
-                </button>
-              </li>
-
-              <li>
-                <button
-                  className='bf-drawerItem'
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    if (confirm("Clear all Continue Watching progress?")) {
-                      setProgress({});
-                    }
-                  }}
-                >
-                  🧹 Clear All Progress
-                </button>
-              </li>
+              {/* Admin controls in drawer */}
+              {!isAdmin ? (
+                <li>
+                  <button
+                    className='bf-drawerItem'
+                    onClick={() => {
+                      login();
+                      setDrawerOpen(false);
+                    }}
+                  >
+                    🔓 Admin Login
+                  </button>
+                </li>
+              ) : (
+                <>
+                  <li>
+                    <button
+                      className='bf-drawerItem'
+                      onClick={() => {
+                        handleAddVideo();
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      ⬆ Upload / Add Video
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className='bf-drawerItem'
+                      onClick={() => {
+                        if (confirm("Clear all Continue Watching progress?")) {
+                          setProgress({});
+                        }
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      🧹 Clear All Progress
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      className='bf-drawerItem'
+                      onClick={() => {
+                        logout();
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      🔒 Admin Logout
+                    </button>
+                  </li>
+                </>
+              )}
             </ul>
           </nav>
         </div>
       )}
 
-      {/* ===== VIDEO GRID — IMPORTANT: direct element with class 'bf-grid' ===== */}
+      {/* ===== VIDEO GRID ===== */}
       <main className='bf-grid'>
         {filtered.length === 0 ? (
           <p className='bf-empty'>No videos found</p>
@@ -188,7 +260,7 @@ export default function Library() {
               </div>
               <div className='bf-meta'>
                 <div className='bf-title'>{video.title}</div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: 8 }}>
                   <button
                     className='bf-watchBtn'
                     onClick={() => alert(`Playing: ${video.title}`)}
@@ -211,6 +283,28 @@ export default function Library() {
                   >
                     {favorites.includes(video.id) ? "★" : "☆"}
                   </button>
+                  {/* Edit/Delete visible only in Admin */}
+                  {isAdmin && (
+                    <>
+                      <button
+                        className='bf-watchBtn'
+                        style={{
+                          background: "#2a6df1",
+                          borderColor: "#2a6df1",
+                        }}
+                        onClick={() => handleEditVideo(video)}
+                      >
+                        ✎ Edit
+                      </button>
+                      <button
+                        className='bf-watchBtn'
+                        style={{ background: "#444", borderColor: "#444" }}
+                        onClick={() => handleDeleteVideo(video.id)}
+                      >
+                        🗑 Delete
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
