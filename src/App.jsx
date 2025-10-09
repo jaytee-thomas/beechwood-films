@@ -1,12 +1,14 @@
-import { Routes, Route } from "react-router-dom";
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Library from "./components/Library.jsx";
-import Favorites from "./components/Favorites.jsx"; // ← add this
+import Player from "./components/Player.jsx";
 
 export default function App() {
   return (
     <Routes>
       <Route path='/' element={<Library />} />
-      <Route path='/favorites' element={<Favorites />} /> {/* ← add this */}
+      <Route path='/watch/:id' element={<Player />} />
+      <Route path='*' element={<Navigate to='/' replace />} />
     </Routes>
   );
 }
