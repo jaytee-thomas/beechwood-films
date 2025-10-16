@@ -984,32 +984,9 @@ export default function Library({
             <section className='bf-showcase bf-showcase--reels' aria-label='Reels library'>
               <div className='bf-showcase__head'>
                 <h2 className='bf-showcase__title'>Reels Library</h2>
-                <p className='bf-showcase__subtitle'>All the social-ready cuts curated in one stream.</p>
+                <p className='bf-showcase__subtitle'>Add reels to your library to see them here.</p>
               </div>
-              {reelsPageCards.length > 0 ? (
-                <div className='bf-showcase__row'>
-                  {reelsPageCards.map((video) => (
-                    <ReelsCard
-                      key={`reel-${video.id}`}
-                      video={video}
-                      isFavorite={favorites.includes(video.id)}
-                      showDelete={adminAuthed && isLibraryVideo(video)}
-                      onPlay={setPlaying}
-                      onToggleFavorite={(videoItem) => {
-                        if (typeof toggleFavorite === "function")
-                          toggleFavorite(videoItem.id);
-                      }}
-                      onShare={shareVideo}
-                      onDelete={requestDelete}
-                      stats={video.stats}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className='bf-showcase__empty'>
-                  No reels matched your search.
-                </div>
-              )}
+              <div className='bf-showcase__empty'>No reels in your library yet.</div>
             </section>
           ) : activeSection === "vids" ? (
             <section className='bf-showcase bf-showcase--vids' aria-label='Vids library'>

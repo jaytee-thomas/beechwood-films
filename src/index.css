@@ -33,12 +33,11 @@ body {
 }
 
 .landing__hero {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 40px;
-  max-width: 1080px;
-  margin: 0;
-  align-items: flex-start;
+  grid-template-columns: minmax(0, 640px) minmax(0, 480px);
+  align-items: center;
+  justify-content: space-between;
 }
 
 .landing__copy {
@@ -94,6 +93,45 @@ body {
 
 .landing__btn--primary:hover {
   transform: translateY(-2px);
+}
+
+.landing__imageFrame {
+  justify-self: stretch;
+  width: min(520px, 100%);
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 32px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 26px 60px rgba(9, 11, 22, 0.45);
+  position: relative;
+  background: linear-gradient(135deg, rgba(20, 21, 30, 0.9), rgba(34, 36, 52, 0.65));
+}
+
+.landing__imageFrame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(126, 92, 238, 0.28), rgba(10, 12, 18, 0.1));
+  pointer-events: none;
+}
+
+.landing__imageFrame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .landing__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .landing__imageFrame {
+    justify-self: start;
+    width: min(520px, 85vw);
+  }
 }
 
 .landing__sections {

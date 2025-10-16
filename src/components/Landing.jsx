@@ -36,6 +36,9 @@ export default function Landing() {
             <Link className='landing__btn landing__btn--primary' to='/library'>Explore Library</Link>
           </div>
         </div>
+        <div className='landing__imageFrame' aria-hidden='true'>
+          <img src='/lPic2.jpg' alt='' loading='lazy' />
+        </div>
       </section>
 
       <section className='landing__sections' aria-label='Library Sections'>
