@@ -1,21 +1,52 @@
 import React, { useMemo, useState } from "react";
 import useLibraryStore from "../store/useLibraryStore";
+import MCard from "./MCard.jsx";
 
 export default function Favorites() {
-  const videos = useLibraryStore((s) => s.videos);
-  const progress = useLibraryStore((s) => s.progress);
+  const {
+    videos,
+    progress,
+    durations,
+    favorites,
+    toggleFavorite,
+  } = useLibraryStore((state) => ({
+    videos: state.videos,
+    progress: state.progress,
+    durations: state.durations,
+    favorites: state.favorites,
+    toggleFavorite: state.toggleFavorite,
+  }));
   const [search, setSearch] = useState("");
   const [playing, setPlaying] = useState(null);
 
-  const list = Array.isArray(videos) ? videos : [];
+  const favoriteSet = useMemo(
+    () => new Set(Array.isArray(favorites) ? favorites : []),
+    [favorites]
+  );
+
+  const favoriteVideos = useMemo(
+    () => (Array.isArray(videos) ? videos : []).filter((video) => favoriteSet.has(video.id)),
+    [videos, favoriteSet]
+  );
 
   const filtered = useMemo(() => {
-    return list
-      .filter((v) => v.favorite)
-      .filter((v) =>
-        (v.title || "").toLowerCase().includes(search.toLowerCase())
-      );
-  }, [list, search]);
+    const term = search.trim().toLowerCase();
+    if (!term) return favoriteVideos;
+    return favoriteVideos.filter((video) =>
+      (video.title || "").toLowerCase().includes(term)
+    );
+  }, [favoriteVideos, search]);
+
+  const progressLabelFor = (video) => {
+    const watched = progress?.[video.id];
+    const durationSeconds = durations?.[video.id];
+    if (!watched || !durationSeconds || durationSeconds <= 0) return null;
+    const percent = Math.max(
+      0,
+      Math.min(100, Math.round((watched / durationSeconds) * 100))
+    );
+    return `${percent}% watched`;
+  };
 
   return (
     <div className='bf-page'>
@@ -47,56 +78,24 @@ export default function Favorites() {
               No favorites yet. Tap ♡ on any film to add.
             </div>
           ) : (
-            filtered.map((v) => {
-              const hasProgress = !!progress?.[v.id]?.t;
+            filtered.map((video) => {
+              const progressLabel = progressLabelFor(video);
+              const baseStats = progressLabel
+                ? { views: progressLabel, age: video.duration || "" }
+                : video.duration
+                ? { views: video.duration, age: "" }
+                : null;
+
               return (
-                <div key={v.id} className='bf-card'>
-                  <div className='bf-thumbWrap' onClick={() => setPlaying(v)}>
-                    <img
-                      src={
-                        v.thumbnail ||
-                        "https://via.placeholder.com/800x450?text=No+Thumbnail"
-                      }
-                      alt={v.title || "Untitled"}
-                      className='bf-thumb'
-                    />
-                    {v.duration ? (
-                      <span className='bf-badge'>{v.duration}</span>
-                    ) : null}
-                  </div>
-
-                  <div className='bf-cardBody'>
-                    <div className='bf-titleRow'>
-                      <div className='bf-cardTitle'>
-                        {v.title || "Untitled"}
-                      </div>
-                      <div className='bf-titleActions'>
-                        {hasProgress && (
-                          <span className='bf-pillResume' title='Has progress'>
-                            ► Resume
-                          </span>
-                        )}
-                        <span
-                          className='bf-favBtn is-active'
-                          aria-label='Favorite'
-                        >
-                          ♥
-                        </span>
-                      </div>
-                    </div>
-
-                    {Array.isArray(v.tags) && v.tags.length > 0 ? (
-                      <div className='bf-meta'>#{v.tags.join(" #")}</div>
-                    ) : null}
-
-                    <button
-                      className='bf-watchBtn'
-                      onClick={() => setPlaying(v)}
-                    >
-                      ▶︎ Watch
-                    </button>
-                  </div>
-                </div>
+                <MCard
+                  key={video.id}
+                  video={video}
+                  variant='doc'
+                  stats={baseStats}
+                  isFavorite
+                  onPlay={(selected) => setPlaying(selected)}
+                  onToggleFavorite={(selected) => toggleFavorite(selected.id)}
+                />
               );
             })
           )}

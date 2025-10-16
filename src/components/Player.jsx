@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import useLibraryStore from "../store/useLibraryStore";
 import useAdmin from "../store/useAdmin";
 import Header from "./Header";
+import MCard from "./MCard.jsx";
 
 export default function Player() {
   const { id } = useParams();
@@ -26,9 +27,6 @@ export default function Player() {
 
   // left rail section
   const [section, setSection] = useState("home");
-
-  // hover preview state for rows under the player
-  const [previewId, setPreviewId] = useState(null);
 
   const video = useMemo(
     () => videos.find((v) => String(v.id) === String(id)),
@@ -116,17 +114,6 @@ export default function Player() {
     navigate(`/watch/${vid.id}`);
   }
 
-  function getPreviewSrc(v) {
-    if (v.provider === "youtube" && v.embedUrl) {
-      const pid = v.providerId || "";
-      return `${v.embedUrl}?autoplay=1&mute=1&controls=0&loop=1&playlist=${pid}&modestbranding=1&playsinline=1&rel=0&vq=small`;
-    }
-    if (v.provider === "vimeo" && v.embedUrl) {
-      return `${v.embedUrl}?autoplay=1&muted=1&loop=1&background=1#t=0s`;
-    }
-    return null;
-  }
-
   // progress percent helper for cards
   const percentFor = (vid) => {
     const p = progress[vid.id];
@@ -134,6 +121,22 @@ export default function Player() {
     if (!p || !d || d <= 0) return null;
     const pct = Math.max(0, Math.min(100, Math.round((p / d) * 100)));
     return pct;
+  };
+
+  const shareVideo = (videoItem) => {
+    if (typeof navigator !== "undefined" && navigator?.share) {
+      navigator
+        .share({
+          title: videoItem.title,
+          url:
+            typeof window !== "undefined"
+              ? window.location.origin + `/watch/${videoItem.id}`
+              : undefined,
+        })
+        .catch(() => {});
+    } else if (typeof window !== "undefined") {
+      window.alert(`Share "${videoItem.title}" with your collaborators!`);
+    }
   };
 
   return (
@@ -319,92 +322,39 @@ export default function Player() {
                   <section className='bf-upnext'>
                     <h3 className='bf-sectionTitle'>Up next</h3>
                     <div className='bf-grid three-across'>
-                      {related.map((v) => {
-                        const active = previewId === v.id;
-                        const preview = getPreviewSrc(v);
+                      {related.map((videoItem) => {
+                        const durationLabel =
+                          videoItem.duration ||
+                          videoItem.runtime ||
+                          videoItem.date ||
+                          "";
+                        const secondaryLabel =
+                          videoItem.library ||
+                          (Array.isArray(videoItem.tags) &&
+                            videoItem.tags.length > 0
+                            ? videoItem.tags[0]
+                            : "") ||
+                          "";
+                        let stats = null;
+                        if (durationLabel || secondaryLabel) {
+                          stats = {
+                            views: durationLabel || undefined,
+                            age: secondaryLabel || undefined,
+                          };
+                        }
                         return (
-                          <div
-                            key={v.id}
-                            className='bf-card'
-                            onMouseEnter={() => setPreviewId(v.id)}
-                            onMouseLeave={() =>
-                              setPreviewId((pid) => (pid === v.id ? null : pid))
+                          <MCard
+                            key={videoItem.id}
+                            video={videoItem}
+                            variant='short'
+                            stats={stats}
+                            onPlay={(selected) => playVideoById(selected)}
+                            onToggleFavorite={(selected) =>
+                              toggleFavorite(selected.id)
                             }
-                            onClick={() => playVideoById(v)}
-                            role='button'
-                            tabIndex={0}
-                            onKeyDown={(e) =>
-                              (e.key === "Enter" || e.key === " ") &&
-                              playVideoById(v)
-                            }
-                          >
-                            <div className='bf-thumbWrap'>
-                              <img src={v.thumbnail} alt={v.title} />
-                              {active && (
-                                <div className='bf-previewLayer'>
-                                  {v.provider === "file" && v.embedUrl ? (
-                                    <video
-                                      src={v.embedUrl}
-                                      muted
-                                      playsInline
-                                      autoPlay
-                                      loop
-                                      preload='metadata'
-                                      className='bf-previewVideo'
-                                    />
-                                  ) : preview ? (
-                                    <iframe
-                                      className='bf-previewFrame'
-                                      src={preview}
-                                      title={`${v.title} preview`}
-                                      allow='autoplay; fullscreen; picture-in-picture'
-                                      allowFullScreen={false}
-                                      loading='eager'
-                                    />
-                                  ) : null}
-                                </div>
-                              )}
-                            </div>
-
-                            <div
-                              className='bf-meta'
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className='bf-title' title={v.title}>
-                                {v.title}
-                              </div>
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button
-                                  className='bf-watchBtn'
-                                  onClick={() => playVideoById(v)}
-                                >
-                                  ▶ Watch
-                                </button>
-                                <button
-                                  className='bf-watchBtn'
-                                  style={{
-                                    background: favorites.includes(v.id)
-                                      ? "#20222a"
-                                      : "#e50914",
-                                    borderColor: favorites.includes(v.id)
-                                      ? "#2f3240"
-                                      : "#e50914",
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleFavorite(v.id);
-                                  }}
-                                  aria-label={
-                                    favorites.includes(v.id)
-                                      ? "Remove from favorites"
-                                      : "Add to favorites"
-                                  }
-                                >
-                                  {favorites.includes(v.id) ? "★" : "☆"}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                            onShare={shareVideo}
+                            isFavorite={favorites.includes(videoItem.id)}
+                          />
                         );
                       })}
                     </div>
@@ -416,104 +366,39 @@ export default function Player() {
                   <section className='bf-continue'>
                     <h3 className='bf-sectionTitle'>Continue watching</h3>
                     <div className='bf-grid three-across'>
-                      {continueList.map((v) => {
-                        const active = previewId === v.id;
-                        const preview = getPreviewSrc(v);
-                        const pct = percentFor(v); // null if unknown
+                      {continueList.map((videoItem) => {
+                        const pct = percentFor(videoItem); // null if unknown
+                        const stats =
+                          pct !== null
+                            ? {
+                                views: `${pct}% watched`,
+                                age: videoItem.duration || "",
+                              }
+                            : videoItem.duration
+                            ? { views: videoItem.duration, age: "" }
+                            : null;
                         return (
-                          <div
-                            key={v.id}
-                            className='bf-card'
-                            onMouseEnter={() => setPreviewId(v.id)}
-                            onMouseLeave={() =>
-                              setPreviewId((pid) => (pid === v.id ? null : pid))
-                            }
-                            onClick={() => playVideoById(v)}
-                            role='button'
-                            tabIndex={0}
-                            onKeyDown={(e) =>
-                              (e.key === "Enter" || e.key === " ") &&
-                              playVideoById(v)
-                            }
-                          >
-                            <div className='bf-thumbWrap'>
-                              <img src={v.thumbnail} alt={v.title} />
-                              {active && (
-                                <div className='bf-previewLayer'>
-                                  {v.provider === "file" && v.embedUrl ? (
-                                    <video
-                                      src={v.embedUrl}
-                                      muted
-                                      playsInline
-                                      autoPlay
-                                      loop
-                                      preload='metadata'
-                                      className='bf-previewVideo'
-                                    />
-                                  ) : preview ? (
-                                    <iframe
-                                      className='bf-previewFrame'
-                                      src={preview}
-                                      title={`${v.title} preview`}
-                                      allow='autoplay; fullscreen; picture-in-picture'
-                                      allowFullScreen={false}
-                                      loading='eager'
-                                    />
-                                  ) : null}
-                                </div>
-                              )}
-
-                              {/* progress bar overlay */}
-                              {pct !== null && (
-                                <div className='bf-progress'>
-                                  <div
-                                    className='bf-progressFill'
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-
-                            <div
-                              className='bf-meta'
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className='bf-title' title={v.title}>
-                                {v.title}
-                                {pct !== null && (
-                                  <span
-                                    style={{
-                                      marginLeft: 8,
-                                      fontSize: ".8rem",
-                                      opacity: 0.8,
-                                    }}
-                                  >
-                                    {pct}% watched
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button
-                                  className='bf-watchBtn'
-                                  onClick={() => playVideoById(v)}
-                                >
-                                  ▶ Resume
-                                </button>
-                                <button
-                                  className='bf-watchBtn'
-                                  style={{
-                                    background: "#444",
-                                    borderColor: "#444",
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    clearProgress(v.id);
-                                  }}
-                                >
-                                  ✖ Clear
-                                </button>
-                              </div>
-                            </div>
+                          <div key={videoItem.id} className='bf-cardCell'>
+                            <MCard
+                              video={videoItem}
+                              variant='short'
+                              stats={stats}
+                              onPlay={(selected) => playVideoById(selected)}
+                              onToggleFavorite={(selected) =>
+                                toggleFavorite(selected.id)
+                              }
+                              onShare={shareVideo}
+                              isFavorite={favorites.includes(videoItem.id)}
+                            />
+                            {pct !== null && (
+                              <button
+                                type='button'
+                                className='bf-cardAction'
+                                onClick={() => clearProgress(videoItem.id)}
+                              >
+                                Clear progress
+                              </button>
+                            )}
                           </div>
                         );
                       })}

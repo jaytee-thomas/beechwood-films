@@ -1,71 +1,173 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Menu, Shield, Upload, LogOut, X } from "lucide-react";
+import useAdminPanel from "../store/useAdminPanel";
 
-export default function Header({
-  search = "",
-  onSearchChange = () => {},
-  view = "library",
-  onSetView = () => {},
-  isAdmin = false,
-  onHamburgerClick = () => {},
-}) {
+const navLinks = [
+  { to: "/", label: "Home" },
+  { to: "/library", label: "Library" },
+  { to: "/reels", label: "Reels" },
+  { to: "/vids", label: "Vids" },
+  { to: "/favorites", label: "Favorites" },
+  { to: "/about", label: "About" },
+];
+
+export default function Header({ search, setSearch }) {
+  const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const {
+    isAuthed,
+    openLogin,
+    openUpload,
+    clearAuthed,
+  } = useAdminPanel();
+
+  const isActive = (href) => {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const showSearch = pathname !== "/";
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
   return (
-    <header className='bf-header'>
-      <div className='bf-leftCluster'>
-        <button
-          className='bf-hamburger'
-          onClick={onHamburgerClick}
-          aria-label='Open menu'
-        >
-          ☰
-        </button>
-
-        <div className='bf-logoGroup'>
-          {/* small camera icon + text */}
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            viewBox='0 0 24 24'
-            className='bf-logoIcon'
-            aria-hidden='true'
+    <>
+      <header className='bf-header' role='banner'>
+        <div className='bf-leftCluster'>
+          <button
+            type='button'
+            className='bf-hamburger'
+            aria-label='Open navigation menu'
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
           >
-            <path
-              fill='currentColor'
-              d='M17 10.5V7c0-.55-.45-1-1-1H4C3.45 6 3 6.45 3 7v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z'
-            />
-          </svg>
-          <span className='bf-logoText'>Beechwood Films</span>
+            <Menu size={18} />
+          </button>
+
+          <div className='bf-logoGroup' aria-label='Beechwood Films'>
+            <svg className='bf-logoIcon' viewBox='0 0 24 24'>
+              <path
+                fill='currentColor'
+                d='M4 7a2 2 0 0 1 2-2h5l1.2 1.8h3.6L18 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm6 9 6-4-6-4v8z'
+              />
+            </svg>
+            <span className='bf-logoText'>Beechwood Films</span>
+          </div>
         </div>
-      </div>
 
-      <div className='bf-searchWrap'>
-        <input
-          type='text'
-          className='bf-search'
-          placeholder='Search'
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-        <span className='bf-searchIcon' aria-hidden='true'>
-          🔍
-        </span>
-      </div>
-
-      <div className='bf-actions'>
-        <button
-          className={`bf-navBtn ${view === "library" ? "is-active" : ""}`}
-          onClick={() => onSetView("library")}
-        >
-          Library
-        </button>
-        <button
-          className={`bf-navBtn ${view === "favorites" ? "is-active" : ""}`}
-          onClick={() => onSetView("favorites")}
-        >
-          Favorites
-        </button>
-        {isAdmin && (
-          <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>Admin On</span>
+        {showSearch ? (
+          <div className='bf-searchWrap'>
+            <input
+              className='bf-search'
+              placeholder='Search…'
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label='Search library'
+            />
+            <span className='bf-searchIcon'>🔎</span>
+          </div>
+        ) : (
+          <div aria-hidden='true' className='bf-searchSpacer' />
         )}
-      </div>
-    </header>
+
+        <div className='bf-actions'>
+          {!isAuthed ? (
+            <button
+              type='button'
+              className='bf-actionBtn bf-actionBtn--admin'
+              onClick={openLogin}
+              aria-label='Open admin access'
+            >
+              <Shield size={16} />
+              <span>Admin</span>
+            </button>
+          ) : (
+            <>
+              <button
+                type='button'
+                className='bf-actionBtn bf-actionBtn--accent'
+                onClick={openUpload}
+                aria-label='Add new video'
+              >
+                <Upload size={16} />
+                <span>Upload</span>
+              </button>
+              <button
+                type='button'
+                className='bf-actionBtn bf-actionBtn--ghost'
+                onClick={clearAuthed}
+                aria-label='Sign out of admin mode'
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      <div
+        className={`bf-overlay ${menuOpen ? "show" : ""}`}
+        onClick={() => setMenuOpen(false)}
+        role='presentation'
+      />
+      <aside
+        className={`bf-drawer ${menuOpen ? "open" : ""}`}
+        aria-hidden={!menuOpen}
+        aria-label='Site navigation'
+      >
+        <div className='bf-drawerHead'>
+          <span className='bf-drawerTitle'>Navigate</span>
+          <button
+            type='button'
+            className='bf-drawerClose'
+            onClick={() => setMenuOpen(false)}
+            aria-label='Close navigation'
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <nav aria-label='Primary navigation'>
+          <ul className='bf-drawerList'>
+            {navLinks.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  className={`bf-drawerItem ${
+                    isActive(link.to) ? "is-active" : ""
+                  }`}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+    </>
   );
 }
