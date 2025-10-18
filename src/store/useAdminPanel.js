@@ -1,24 +1,26 @@
 import { create } from "zustand";
 
-const useAdminPanel = create((set, get) => ({
-  isAuthed: false,
-  showLogin: false,
+import useAuth from "./useAuth.js";
+
+const useAdminPanel = create((set) => ({
+  showAuth: false,
+  authView: "login",
   showUpload: false,
 
-  openLogin: () => set({ showLogin: true }),
-  closeLogin: () => set({ showLogin: false }),
+  openLogin: () => set({ showAuth: true, authView: "login" }),
+  openRegister: () => set({ showAuth: true, authView: "register" }),
+  closeAuth: () => set({ showAuth: false }),
+  setAuthView: (view) => set({ authView: view }),
 
   openUpload: () => {
-    if (!get().isAuthed) {
-      set({ showLogin: true });
+    const user = useAuth.getState().user;
+    if (!user || user.role !== "admin") {
+      set({ showAuth: true, authView: "login" });
       return;
     }
     set({ showUpload: true });
   },
   closeUpload: () => set({ showUpload: false }),
-
-  markAuthed: () => set({ isAuthed: true, showLogin: false }),
-  clearAuthed: () => set({ isAuthed: false, showUpload: false }),
 }));
 
 export default useAdminPanel;

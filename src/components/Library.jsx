@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Heart, X, Pencil } from "lucide-react";
 import useLibraryStore from "../store/useLibraryStore";
 import useProfileStore from "../store/useProfileStore";
-import useAdminPanel from "../store/useAdminPanel";
+import useAuth from "../store/useAuth";
 import MCard from "./MCard.jsx";
 import ReelsCard from "./ReelsCard.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
@@ -528,7 +528,8 @@ export default function Library({
     removeVideo,
   } = useLibraryStore();
   const { profile, updateProfile } = useProfileStore();
-  const { isAuthed: adminAuthed } = useAdminPanel();
+  const authUser = useAuth((state) => state.user);
+  const isAdmin = authUser?.role === "admin";
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const enrichReel = useCallback((video, index = 0) => {
@@ -789,21 +790,25 @@ export default function Library({
 
   const requestDelete = useCallback(
     (video) => {
-      if (!adminAuthed) return;
+      if (!isAdmin) return;
       if (!isLibraryVideo(video)) return;
       setDeleteTarget(video);
     },
-    [adminAuthed, isLibraryVideo]
+    [isAdmin, isLibraryVideo]
   );
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
-    removeVideo(deleteTarget.id);
-    if (playing && playing.id === deleteTarget.id) {
-      setPlaying(null);
+    try {
+      await removeVideo(deleteTarget.id);
+      if (playing && playing.id === deleteTarget.id) {
+        setPlaying(null);
+      }
+      setDeleteTarget(null);
+    } catch (error) {
+      window.alert(error.message || "Could not delete video. Check your admin access.");
     }
-    setDeleteTarget(null);
-  }, [deleteTarget, removeVideo, playing]);
+  }, [deleteTarget, removeVideo, playing, setPlaying]);
 
   const cancelDelete = useCallback(() => {
     setDeleteTarget(null);
@@ -850,7 +855,7 @@ export default function Library({
               style={aboutWallpaperStyle}
               aria-label='About portrait'
             >
-              {adminAuthed && (
+              {isAdmin && (
                 <button
                   type='button'
                   className='bf-aboutEditBtn is-floating'
@@ -930,7 +935,7 @@ export default function Library({
                       variant='doc'
                       showFavorite={favorites.includes(video.id)}
                       isFavorite={favorites.includes(video.id)}
-                      showDelete={adminAuthed && isLibraryVideo(video)}
+                      showDelete={isAdmin && isLibraryVideo(video)}
                       onDelete={requestDelete}
                       onPlay={setPlaying}
                       onToggleFavorite={(videoItem) => {
@@ -961,7 +966,7 @@ export default function Library({
                         key={`reel-${video.id}`}
                         video={video}
                         isFavorite={favorites.includes(video.id)}
-                        showDelete={adminAuthed && isLibraryVideo(video)}
+                        showDelete={isAdmin && isLibraryVideo(video)}
                         onPlay={setPlaying}
                         onToggleFavorite={(videoItem) => {
                           if (typeof toggleFavorite === "function")
@@ -1001,7 +1006,7 @@ export default function Library({
                       key={`vid-${video.id}`}
                       video={video}
                       variant='doc'
-                      showDelete={adminAuthed && isLibraryVideo(video)}
+                      showDelete={isAdmin && isLibraryVideo(video)}
                       onDelete={requestDelete}
                       onPlay={setPlaying}
                       isFavorite={favorites.includes(video.id)}
@@ -1031,7 +1036,7 @@ export default function Library({
                       key={`fav-${video.id}`}
                       video={video}
                       variant='doc'
-                      showDelete={adminAuthed && isLibraryVideo(video)}
+                      showDelete={isAdmin && isLibraryVideo(video)}
                       onDelete={requestDelete}
                       onPlay={setPlaying}
                       isFavorite
@@ -1060,7 +1065,7 @@ export default function Library({
                       variant='doc'
                       onPlay={setPlaying}
                       isFavorite={favOn}
-                      showDelete={adminAuthed && isLibraryVideo(v)}
+                      showDelete={isAdmin && isLibraryVideo(v)}
                       onDelete={requestDelete}
                       onToggleFavorite={(videoItem) => {
                         if (typeof toggleFavorite === "function")

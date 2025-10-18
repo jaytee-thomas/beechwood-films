@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Shield, Upload, LogOut, X } from "lucide-react";
+import { Menu, Shield, Upload, LogOut, UserPlus, Bell, BellRing, X } from "lucide-react";
 import useAdminPanel from "../store/useAdminPanel";
+import useAuth from "../store/useAuth";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -15,12 +16,30 @@ const navLinks = [
 export default function Header({ search, setSearch }) {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const {
-    isAuthed,
-    openLogin,
-    openUpload,
-    clearAuthed,
-  } = useAdminPanel();
+  const { openLogin, openRegister, openUpload } = useAdminPanel();
+  const user = useAuth((state) => state.user);
+  const logout = useAuth((state) => state.logout);
+  const updatePreferences = useAuth((state) => state.updatePreferences);
+
+  const isAuthenticated = Boolean(user);
+  const isAdmin = user?.role === "admin";
+  const isGuest = user?.role === "guest";
+  const displayName = user?.name || user?.email || (isGuest ? "Guest" : "");
+  const notifyEnabled = Boolean(user?.notifyOnNewVideo);
+  const canToggleNotifications = isAuthenticated && user?.role !== "guest";
+  const [notifPending, setNotifPending] = useState(false);
+
+  const toggleNotifications = async () => {
+    if (!canToggleNotifications) return;
+    setNotifPending(true);
+    try {
+      await updatePreferences({ notifyOnNewVideo: !notifyEnabled });
+    } catch (error) {
+      window.alert(error.message || "Could not update notifications");
+    } finally {
+      setNotifPending(false);
+    }
+  };
 
   const isActive = (href) => {
     if (href === "/") return pathname === "/";
@@ -68,11 +87,10 @@ export default function Header({ search, setSearch }) {
           </button>
 
           <div className='bf-logoGroup' aria-label='Beechwood Films'>
-            <svg className='bf-logoIcon' viewBox='0 0 24 24'>
-              <path
-                fill='currentColor'
-                d='M4 7a2 2 0 0 1 2-2h5l1.2 1.8h3.6L18 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7zm6 9 6-4-6-4v8z'
-              />
+            <svg className='bf-logoIcon' viewBox='0 0 34 24' fill='currentColor'>
+              <path d='M2 9a5 5 0 0 1 5-5h12a5 5 0 0 1 5 5v1.11l5.105-2.553A1 1 0 0 1 31 8.47v7.06a1 1 0 0 1-1.895.553L24 13.53V15a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5z' />
+              <circle cx='12' cy='6' r='3' />
+              <circle cx='6' cy='6' r='3' />
             </svg>
             <span className='bf-logoText'>Beechwood Films</span>
           </div>
@@ -94,35 +112,62 @@ export default function Header({ search, setSearch }) {
         )}
 
         <div className='bf-actions'>
-          {!isAuthed ? (
-            <button
-              type='button'
-              className='bf-actionBtn bf-actionBtn--admin'
-              onClick={openLogin}
-              aria-label='Open admin access'
-            >
-              <Shield size={16} />
-              <span>Admin</span>
-            </button>
-          ) : (
+          {!isAuthenticated && (
             <>
               <button
                 type='button'
-                className='bf-actionBtn bf-actionBtn--accent'
-                onClick={openUpload}
-                aria-label='Add new video'
+                className='bf-actionBtn bf-actionBtn--ghost'
+                onClick={openLogin}
+                aria-label='Sign in'
               >
-                <Upload size={16} />
-                <span>Upload</span>
+                <Shield size={16} />
+                <span>Sign In</span>
               </button>
               <button
                 type='button'
+                className='bf-actionBtn bf-actionBtn--admin'
+                onClick={openRegister}
+                aria-label='Create account'
+              >
+                <UserPlus size={16} />
+                <span>Join</span>
+              </button>
+            </>
+          )}
+
+          {isAuthenticated && (
+            <>
+              {isAdmin && (
+                <button
+                  type='button'
+                  className='bf-actionBtn bf-actionBtn--accent'
+                  onClick={openUpload}
+                  aria-label='Add new video'
+                >
+                  <Upload size={16} />
+                  <span>Upload</span>
+                </button>
+              )}
+              {canToggleNotifications && (
+                <button
+                  type='button'
+                  className='bf-actionBtn bf-actionBtn--ghost'
+                  onClick={toggleNotifications}
+                  disabled={notifPending}
+                  aria-label={notifyEnabled ? "Disable notifications" : "Enable notifications"}
+                >
+                  {notifyEnabled ? <BellRing size={16} /> : <Bell size={16} />}
+                  <span>{notifyEnabled ? "Notifications on" : "Notify me"}</span>
+                </button>
+              )}
+              <button
+                type='button'
                 className='bf-actionBtn bf-actionBtn--ghost'
-                onClick={clearAuthed}
-                aria-label='Sign out of admin mode'
+                onClick={logout}
+                aria-label='Sign out'
               >
                 <LogOut size={16} />
-                <span>Logout</span>
+                <span>{displayName ? `Logout ${displayName}` : "Logout"}</span>
               </button>
             </>
           )}

@@ -5,13 +5,25 @@ import Landing from "./components/Landing.jsx";
 import Library from "./components/Library.jsx";
 import Player from "./components/Player.jsx";
 import AdminPortals from "./components/AdminPortals.jsx";
+import useAuth from "./store/useAuth.js";
+import useLibraryStore from "./store/useLibraryStore.js";
 
 export default function App() {
   const [search, setSearch] = useState("");
+  const refreshSession = useAuth((state) => state.refresh);
+  const refreshVideos = useLibraryStore((state) => state.refreshVideos);
 
   useEffect(() => {
     document.body.classList.remove("bf-railCollapsed");
   }, []);
+
+  useEffect(() => {
+    refreshSession();
+  }, [refreshSession]);
+
+  useEffect(() => {
+    refreshVideos();
+  }, [refreshVideos]);
 
   return (
     <>

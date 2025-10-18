@@ -1,18 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { UserPlus, LogIn, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import useAdminPanel from "../store/useAdminPanel";
 import useLibraryStore from "../store/useLibraryStore";
+import useAuth from "../store/useAuth";
 
-const ADMIN_PIN = "2580";
-
-export function AdminLoginModal({ open, onClose, onSuccess }) {
-  const [pin, setPin] = useState("");
+export function AuthModal({ open, view, onClose, onSwitch }) {
   const [animateIn, setAnimateIn] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [subscribe, setSubscribe] = useState(true);
+  const [localError, setLocalError] = useState("");
+  const [pending, setPending] = useState(false);
+  const { login, register, guest, resetError, error } = useAuth();
 
   useEffect(() => {
     if (!open) return undefined;
-    setPin("");
+    setEmail("");
+    setPassword("");
+    setName("");
+    setSubscribe(true);
+    setLocalError("");
+    resetError();
     const frame = requestAnimationFrame(() => setAnimateIn(true));
     const handleKey = (event) => {
       if (event.key === "Escape") onClose();
@@ -26,17 +36,41 @@ export function AdminLoginModal({ open, onClose, onSuccess }) {
       window.removeEventListener("keydown", handleKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose]);
+  }, [open, onClose, resetError, view]);
 
   if (!open) return null;
 
-  const submit = (e) => {
-    e.preventDefault();
-    if (pin === ADMIN_PIN) {
-      onSuccess();
+  const isRegister = view === "register";
+  const activeError = localError || error;
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setPending(true);
+    setLocalError("");
+    try {
+      if (isRegister) {
+        await register({ email, password, name, subscribe });
+      } else {
+        await login({ email, password });
+      }
       onClose();
-    } else {
-      alert("Incorrect PIN");
+    } catch (err) {
+      setLocalError(err.message);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const handleGuest = async () => {
+    setPending(true);
+    setLocalError("");
+    try {
+      await guest();
+      onClose();
+    } catch (err) {
+      setLocalError(err.message);
+    } finally {
+      setPending(false);
     }
   };
 
@@ -51,55 +85,120 @@ export function AdminLoginModal({ open, onClose, onSuccess }) {
         className={`bf-adminDrawer ${animateIn ? "is-open" : ""}`}
         role='dialog'
         aria-modal='true'
-        aria-labelledby='bf-adminDrawerTitle'
+        aria-labelledby='bf-authDrawerTitle'
       >
         <div className='bf-adminDrawer__head'>
           <div className='bf-adminDrawer__intro'>
-            <h3 id='bf-adminDrawerTitle' className='bf-adminDrawer__title'>
-              Admin Access
+            <h3 id='bf-authDrawerTitle' className='bf-adminDrawer__title'>
+              {isRegister ? "Create your account" : "Welcome back"}
             </h3>
             <p className='bf-adminDrawer__sub'>
-              Enter your admin PIN to unlock editing tools, upload videos, and manage the library.
+              {isRegister
+                ? "Sign up to save favorites, get notified about new videos, and unlock more features."
+                : "Sign in to access your library, notifications, and admin tools."}
             </p>
           </div>
           <button
             type='button'
             className='bf-adminDrawer__close'
             onClick={onClose}
-            aria-label='Close admin panel'
+            aria-label='Close authentication panel'
           >
             <X size={18} />
           </button>
         </div>
 
-        <form className='bf-adminDrawer__form' onSubmit={submit}>
+        <form className='bf-adminDrawer__form' onSubmit={handleSubmit}>
+          {isRegister && (
+            <label className='bf-adminDrawer__label'>
+              Display name
+              <input
+                type='text'
+                className='bf-adminDrawer__input'
+                placeholder='Name for greetings'
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+          )}
           <label className='bf-adminDrawer__label'>
-            Admin PIN
+            Email
             <input
-              type='password'
+              type='email'
               className='bf-adminDrawer__input'
-              placeholder='Enter PIN'
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              placeholder='you@example.com'
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
               autoFocus
             />
           </label>
+          <label className='bf-adminDrawer__label'>
+            Password
+            <input
+              type='password'
+              className='bf-adminDrawer__input'
+              placeholder='••••••••'
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
+
+          {isRegister && (
+            <label className='bf-adminDrawer__checkbox'>
+              <input
+                type='checkbox'
+                checked={subscribe}
+                onChange={(event) => setSubscribe(event.target.checked)}
+              />
+              Email me when new videos drop
+            </label>
+          )}
+
+          {activeError && <div className='bf-adminDrawer__error'>{activeError}</div>}
+
           <div className='bf-adminDrawer__actions'>
             <button
               type='button'
               className='bf-adminDrawer__btn'
-              onClick={onClose}
+              onClick={handleGuest}
+              disabled={pending}
             >
-              Cancel
+              Continue as guest
             </button>
             <button
               type='submit'
               className='bf-adminDrawer__btn bf-adminDrawer__btn--primary'
+              disabled={pending}
             >
-              Unlock
+              {pending ? "Processing…" : isRegister ? "Create account" : "Sign in"}
             </button>
           </div>
         </form>
+
+        <div className='bf-adminDrawer__footer'>
+          <button
+            type='button'
+            className='bf-authToggle'
+            onClick={() => onSwitch(isRegister ? "login" : "register")}
+          >
+            {isRegister ? (
+              <>
+                <LogIn size={16} />
+                <span>Already have an account? Sign in</span>
+              </>
+            ) : (
+              <>
+                <UserPlus size={16} />
+                <span>Need an account? Register</span>
+              </>
+            )}
+          </button>
+          <p className='bf-authHint'>
+            Admins should sign in with the email configured on the server to unlock editing.
+          </p>
+        </div>
       </aside>
     </>
   );
@@ -116,6 +215,8 @@ function UploadModal({ open, onClose, onAdd }) {
   const [library, setLibrary] = useState("vids");
   const [tags, setTags] = useState("");
   const [fileName, setFileName] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const makeThumb = (videoEl) =>
     new Promise((resolve) => {
@@ -176,25 +277,67 @@ function UploadModal({ open, onClose, onAdd }) {
     if (!date.trim()) setDate(new Date().toISOString().slice(0, 10));
   };
 
-  const submit = (e) => {
-    e.preventDefault();
+  const detectProvider = (url) => {
+    if (!url) return { provider: "custom", embedUrl: "", providerId: null };
+    const trimmed = url.trim();
+    const ytMatch = trimmed.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/i);
+    if (ytMatch) {
+      const id = ytMatch[1];
+      return {
+        provider: "youtube",
+        embedUrl: `https://www.youtube.com/embed/${id}`,
+        providerId: id
+      };
+    }
+    const vimeoMatch = trimmed.match(/vimeo\.com\/(\d+)/i);
+    if (vimeoMatch) {
+      const id = vimeoMatch[1];
+      return {
+        provider: "vimeo",
+        embedUrl: `https://player.vimeo.com/video/${id}`,
+        providerId: id
+      };
+    }
+    return {
+      provider: "file",
+      embedUrl: trimmed,
+      providerId: fileName || null
+    };
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
     if (!title.trim() || !src.trim()) return;
 
-    onAdd({
-      title: title.trim(),
-      src: src.trim(),
-      thumbnail: thumbnail.trim(),
-      duration: duration.trim(),
-      date: date.trim(),
-      library: library.trim(),
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      source: src.startsWith("blob:") ? "local" : "custom",
-      fileName: fileName || undefined,
-    });
-    onClose();
+    setSaving(true);
+    setError("");
+    try {
+      const trimmedSrc = src.trim();
+      const { provider, embedUrl, providerId } = detectProvider(trimmedSrc);
+      await onAdd({
+        title: title.trim(),
+        embedUrl: embedUrl || trimmedSrc,
+        src: trimmedSrc,
+        provider,
+        providerId,
+        thumbnail: thumbnail.trim(),
+        previewSrc: trimmedSrc.startsWith("blob:") ? trimmedSrc : undefined,
+        duration: duration.trim(),
+        date: date.trim(),
+        library: library.trim(),
+        tags: tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        source: trimmedSrc.startsWith("blob:") ? "local" : "custom",
+        fileName: fileName || undefined,
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || "Could not save video");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const S = {
@@ -241,6 +384,15 @@ function UploadModal({ open, onClose, onAdd }) {
       justifyContent: "flex-end",
       gap: 10,
       marginTop: 6,
+    },
+    error: {
+      marginTop: 8,
+      background: "rgba(240, 74, 111, 0.14)",
+      border: "1px solid rgba(240, 74, 111, 0.4)",
+      color: "#ff9ab6",
+      borderRadius: 10,
+      padding: "8px 12px",
+      fontSize: "0.9rem",
     },
     sectionLabel: { fontSize: ".9rem", color: "#b9bcc6", fontWeight: 500 },
     typeWrap: { display: "flex", flexDirection: "column", gap: 8 },
@@ -388,12 +540,18 @@ function UploadModal({ open, onClose, onAdd }) {
             </label>
           </div>
 
+          {error && <div style={S.error}>{error}</div>}
+
           <div style={S.actions}>
             <button type='button' style={S.btn} onClick={onClose}>
               Cancel
             </button>
-            <button type='submit' style={{ ...S.btn, ...S.primary }}>
-              Save
+            <button
+              type='submit'
+              style={{ ...S.btn, ...S.primary, opacity: saving ? 0.7 : 1 }}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </form>
@@ -406,30 +564,38 @@ export default function AdminPortals() {
   const navigate = useNavigate();
   const { addVideo } = useLibraryStore();
   const {
-    isAuthed,
-    showLogin,
-    closeLogin,
-    markAuthed,
+    showAuth,
+    authView,
+    closeAuth,
+    setAuthView,
     showUpload,
     closeUpload,
   } = useAdminPanel();
+  const { user } = useAuth();
+
+  const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    if (!isAdmin) closeUpload();
+  }, [isAdmin, closeUpload]);
 
   return (
     <>
-      <AdminLoginModal
-        open={showLogin}
-        onClose={closeLogin}
-        onSuccess={markAuthed}
+      <AuthModal
+        open={showAuth}
+        view={authView}
+        onClose={closeAuth}
+        onSwitch={setAuthView}
       />
       <UploadModal
-        open={isAuthed && showUpload}
+        open={isAdmin && showUpload}
         onClose={closeUpload}
-        onAdd={(video) => {
-          const added = addVideo(video);
-          const target = (video.library || "").toLowerCase();
+        onAdd={async (video) => {
+          const created = await addVideo(video);
+          const target = (created?.library || video.library || "").toLowerCase();
           if (target === "reels") navigate("/reels");
           else navigate("/vids");
-          return added;
+          return created;
         }}
       />
     </>

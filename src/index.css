@@ -240,8 +240,8 @@ body {
 }
 
 .bf-logoIcon {
-  width: 22px;
-  height: 22px;
+  width: 34px;
+  height: 34px;
   color: inherit;
   flex-shrink: 0;
 }
@@ -625,6 +625,60 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.bf-adminDrawer__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: rgba(235, 238, 255, 0.78);
+}
+
+.bf-adminDrawer__checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-border);
+}
+
+.bf-adminDrawer__error {
+  background: rgba(240, 74, 111, 0.12);
+  border: 1px solid rgba(240, 74, 111, 0.36);
+  color: #ff94b2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+}
+
+.bf-adminDrawer__footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.bf-authToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  color: rgba(193, 200, 255, 0.88);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bf-authToggle:hover {
+  color: #ffffff;
+}
+
+.bf-authHint {
+  font-size: 0.78rem;
+  color: rgba(211, 218, 255, 0.58);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .bf-adminDrawer__btn {

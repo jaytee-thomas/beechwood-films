@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import useLibraryStore from "../store/useLibraryStore";
-import useAdmin from "../store/useAdmin";
+import useAuth from "../store/useAuth";
+import useAdminPanel from "../store/useAdminPanel";
 import Header from "./Header";
 import MCard from "./MCard.jsx";
 
@@ -19,7 +20,12 @@ export default function Player() {
     setDuration,
     recordWatch,
   } = useLibraryStore();
-  const { isAdmin, login, logout } = useAdmin();
+  const authUser = useAuth((state) => state.user);
+  const logout = useAuth((state) => state.logout);
+  const openLogin = useAdminPanel((state) => state.openLogin);
+  const isAdmin = authUser?.role === "admin";
+  const isAuthenticated = Boolean(authUser);
+  const displayName = authUser?.name || authUser?.email || (authUser?.role === "guest" ? "Guest" : "Profile");
 
   // header states
   const [search, setSearch] = useState("");
@@ -204,8 +210,8 @@ export default function Player() {
           </button>
 
           <div className='bf-sideSpacer' />
-          {!isAdmin ? (
-            <button className='bf-sideItem' onClick={login} title='Admin Login'>
+          {!isAuthenticated ? (
+            <button className='bf-sideItem' onClick={openLogin} title='Sign in'>
               <span className='bf-sideIcon'>
                 <svg viewBox='0 0 24 24'>
                   <path
@@ -214,25 +220,27 @@ export default function Player() {
                   />
                 </svg>
               </span>
-              <span className='bf-sideLabel'>Admin</span>
+              <span className='bf-sideLabel'>Sign In</span>
             </button>
           ) : (
             <>
-              <button
-                className='bf-sideItem'
-                onClick={() => navigate("/")}
-                title='Back to Library'
-              >
-                <span className='bf-sideIcon'>
-                  <svg viewBox='0 0 24 24'>
-                    <path
-                      fill='currentColor'
-                      d='M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z'
-                    />
-                  </svg>
-                </span>
-                <span className='bf-sideLabel'>Library</span>
-              </button>
+              {isAdmin && (
+                <button
+                  className='bf-sideItem'
+                  onClick={() => navigate("/")}
+                  title='Back to Library'
+                >
+                  <span className='bf-sideIcon'>
+                    <svg viewBox='0 0 24 24'>
+                      <path
+                        fill='currentColor'
+                        d='M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z'
+                      />
+                    </svg>
+                  </span>
+                  <span className='bf-sideLabel'>Library</span>
+                </button>
+              )}
               <button className='bf-sideItem' onClick={logout} title='Logout'>
                 <span className='bf-sideIcon'>
                   <svg viewBox='0 0 24 24'>
@@ -242,7 +250,7 @@ export default function Player() {
                     />
                   </svg>
                 </span>
-                <span className='bf-sideLabel'>Logout</span>
+                <span className='bf-sideLabel'>Logout {displayName}</span>
               </button>
             </>
           )}
