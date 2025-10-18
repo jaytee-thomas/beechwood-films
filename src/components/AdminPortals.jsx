@@ -5,6 +5,9 @@ import useAdminPanel from "../store/useAdminPanel";
 import useLibraryStore from "../store/useLibraryStore";
 import useAuth from "../store/useAuth";
 
+const API_BASE =
+  import.meta.env.VITE_API_URL || "http://localhost:4000";
+
 export function AuthModal({ open, view, onClose, onSwitch }) {
   const [animateIn, setAnimateIn] = useState(false);
   const [email, setEmail] = useState("");
@@ -217,6 +220,8 @@ function UploadModal({ open, onClose, onAdd }) {
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [file, setFile] = useState(null);
+  const token = useAuth((state) => state.token);
 
   const makeThumb = (videoEl) =>
     new Promise((resolve) => {
@@ -250,6 +255,7 @@ function UploadModal({ open, onClose, onAdd }) {
     const f = e.target.files?.[0];
     if (!f) return;
     setFileName(f.name);
+    setFile(f);
     const blobUrl = URL.createObjectURL(f);
     setSrc(blobUrl);
 
@@ -314,14 +320,78 @@ function UploadModal({ open, onClose, onAdd }) {
     try {
       const trimmedSrc = src.trim();
       const { provider, embedUrl, providerId } = detectProvider(trimmedSrc);
+
+      let finalSrc = trimmedSrc;
+      let finalThumbnail = thumbnail.trim();
+      let finalProvider = provider;
+      let finalProviderId = providerId;
+      let finalSource = trimmedSrc.startsWith("blob:") ? "local" : "custom";
+
+      if (file && trimmedSrc.startsWith("blob:")) {
+        if (!token) {
+          throw new Error("You need to sign in again to upload files.");
+        }
+
+        const presignResponse = await fetch(`${API_BASE}/api/uploads/presign`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type || "application/octet-stream"
+          })
+        });
+
+        if (!presignResponse.ok) {
+          throw new Error(
+            `Failed to prepare upload (status ${presignResponse.status})`
+          );
+        }
+
+        const presign = await presignResponse.json();
+        const uploadHeaders = new Headers(presign.headers || {});
+        if (!uploadHeaders.has("Content-Type")) {
+          uploadHeaders.set(
+            "Content-Type",
+            file.type || "application/octet-stream"
+          );
+        }
+
+        const uploadResponse = await fetch(presign.uploadUrl, {
+          method: presign.method || "PUT",
+          headers: Object.fromEntries(uploadHeaders.entries()),
+          body: file
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error("Upload failed. Please try again.");
+        }
+
+        finalSrc = presign.fileUrl;
+        finalProvider = "file";
+        finalProviderId = presign.key;
+        finalSource = "upload";
+
+        if (!finalThumbnail && file.type?.startsWith("image/")) {
+          finalThumbnail = presign.fileUrl;
+        }
+      }
+
       await onAdd({
         title: title.trim(),
-        embedUrl: embedUrl || trimmedSrc,
-        src: trimmedSrc,
-        provider,
-        providerId,
-        thumbnail: thumbnail.trim(),
-        previewSrc: trimmedSrc.startsWith("blob:") ? trimmedSrc : undefined,
+        embedUrl: embedUrl || finalSrc,
+        src: finalSrc,
+        provider: finalProvider,
+        providerId: finalProviderId,
+        thumbnail: finalThumbnail,
+        previewSrc:
+          finalSource === "upload"
+            ? undefined
+            : trimmedSrc.startsWith("blob:")
+            ? trimmedSrc
+            : undefined,
         duration: duration.trim(),
         date: date.trim(),
         library: library.trim(),
@@ -329,7 +399,7 @@ function UploadModal({ open, onClose, onAdd }) {
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean),
-        source: trimmedSrc.startsWith("blob:") ? "local" : "custom",
+        source: finalSource,
         fileName: fileName || undefined,
       });
       onClose();

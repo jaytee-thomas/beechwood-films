@@ -1,2 +1,4 @@
 db.json
-
+app.db
+*.db-shm
+*.db-wal

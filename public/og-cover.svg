@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#g)"/>
+  <g fill="none" stroke="#F9FAFB" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" transform="translate(290 180)">
+    <path d="M0 210V20h170v190zM620 210V20H450v190z"/>
+    <path d="M230 110h40M80 100l60-60M140 100l60-60M470 100l60-60M530 100l60-60M0 210h50M620 210h-50"/>
+  </g>
+  <text x="600" y="460" fill="#F9FAFB" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="64" font-weight="600" text-anchor="middle" letter-spacing="4">BEECHWOOD FILMS</text>
+  <text x="600" y="520" fill="#d1d5db" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="28" text-anchor="middle" letter-spacing="4">ORIGINALS • DOCS • REELS</text>
+</svg>

@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import useAuth from "./useAuth.js";
+import useAdminPanel from "./useAdminPanel.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_BASE =
+  import.meta.env?.VITE_API_URL || process.env.VITE_API_URL || "http://localhost:4000";
 
 /** Storage keys */
 const KEY_FAVORITES = "bf_favs_v1";
@@ -25,8 +27,8 @@ const write = (key, value) => {
   } catch {}
 };
 
-const loadFavorites = () => read(KEY_FAVORITES, []);
-const saveFavorites = (value) => write(KEY_FAVORITES, value);
+const readFavorites = () => read(KEY_FAVORITES, []);
+const writeFavorites = (value) => write(KEY_FAVORITES, value);
 
 const loadProgress = () => read(KEY_PROGRESS, {});
 const saveProgress = (value) => write(KEY_PROGRESS, value);
@@ -91,6 +93,13 @@ const parseError = async (response) => {
   }
 };
 
+const handleUnauthorized = () => {
+  const { clearSession } = useAuth.getState();
+  clearSession();
+  const { openLogin } = useAdminPanel.getState();
+  openLogin();
+};
+
 const apiRequest = async (path, options = {}) => {
   let response;
   try {
@@ -106,6 +115,9 @@ const apiRequest = async (path, options = {}) => {
   }
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      handleUnauthorized();
+    }
     throw new Error(await parseError(response));
   }
 
@@ -127,7 +139,7 @@ const useLibraryStore = create((set, get) => ({
   loadingVideos: false,
 
   /** Personal data */
-  favorites: loadFavorites(),
+  favorites: readFavorites(),
   progress: loadProgress(),
   durations: loadDurations(),
   lastWatched: loadLast(),
@@ -232,7 +244,7 @@ const useLibraryStore = create((set, get) => ({
     saveProgress(nextProgress);
     saveDurations(nextDurations);
     saveLast(nextLast);
-    saveFavorites(nextFavorites);
+    writeFavorites(nextFavorites);
 
     set({
       videos,
@@ -245,13 +257,73 @@ const useLibraryStore = create((set, get) => ({
   },
 
   /** Favorites */
-  toggleFavorite: (id) => {
+  toggleFavorite: async (id) => {
     const key = Number(id);
-    const favorites = get().favorites.includes(key)
-      ? get().favorites.filter((value) => value !== key)
-      : [...get().favorites, key];
-    saveFavorites(favorites);
-    set({ favorites });
+    if (!Number.isFinite(key)) return;
+    const favorites = get().favorites;
+    const isFavorite = favorites.includes(key);
+    const user = useAuth.getState().user;
+
+    if (!user || user.role === "guest") {
+      alert("Sign in to save favorites across devices.");
+      useAdminPanel.getState().openLogin();
+      return;
+    }
+
+    try {
+      const headers = authHeaders();
+      if (!headers.Authorization) {
+        throw new Error("Not authenticated");
+      }
+      if (isFavorite) {
+        await apiRequest(`/api/favorites/${key}`, {
+          method: "DELETE",
+          headers
+        });
+      } else {
+        await apiRequest(`/api/favorites/${key}`, {
+          method: "POST",
+          headers
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update favorite", error);
+      alert(error.message || "Could not update favorites. Please try again.");
+      return;
+    }
+
+    const nextFavorites = isFavorite
+      ? favorites.filter((value) => value !== key)
+      : [...favorites, key];
+    writeFavorites(nextFavorites);
+    set({ favorites: nextFavorites });
+  },
+
+  loadFavorites: async () => {
+    const user = useAuth.getState().user;
+    if (!user || user.role === "guest") {
+      const local = readFavorites();
+      set({ favorites: local });
+      return local;
+    }
+    try {
+      const headers = authHeaders();
+      if (!headers.Authorization) throw new Error("Not authenticated");
+      const data = await apiRequest("/api/favorites", {
+        headers
+      });
+      const favorites = Array.isArray(data?.favorites)
+        ? data.favorites.map((value) => Number(value)).filter(Number.isFinite)
+        : [];
+      writeFavorites(favorites);
+      set({ favorites });
+      return favorites;
+    } catch (error) {
+      console.error("Failed to load favorites", error);
+      const local = readFavorites();
+      set({ favorites: local });
+      return local;
+    }
   },
 
   /** Playback progress */

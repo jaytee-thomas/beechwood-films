@@ -3,7 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRouter from "./routes/auth.js";
 import videosRouter from "./routes/videos.js";
-import { ensureDataFile } from "./lib/dataStore.js";
+import favoritesRouter from "./routes/favorites.js";
+import uploadsRouter from "./routes/uploads.js";
+import { initializeDatabase } from "./db/setup.js";
 
 dotenv.config();
 
@@ -34,6 +36,8 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/videos", videosRouter);
+app.use("/api/favorites", favoritesRouter);
+app.use("/api/uploads", uploadsRouter);
 
 app.use((err, req, res, _next) => {
   console.error(err);
@@ -41,7 +45,7 @@ app.use((err, req, res, _next) => {
 });
 
 const start = async () => {
-  await ensureDataFile();
+  initializeDatabase();
   app.listen(port, () => {
     console.log(`API server listening on port ${port}`);
   });
@@ -51,4 +55,3 @@ start().catch((err) => {
   console.error("Failed to start API server", err);
   process.exit(1);
 });
-

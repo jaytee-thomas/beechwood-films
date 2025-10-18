@@ -11,7 +11,9 @@ import useLibraryStore from "./store/useLibraryStore.js";
 export default function App() {
   const [search, setSearch] = useState("");
   const refreshSession = useAuth((state) => state.refresh);
+  const user = useAuth((state) => state.user);
   const refreshVideos = useLibraryStore((state) => state.refreshVideos);
+  const loadFavorites = useLibraryStore((state) => state.loadFavorites);
 
   useEffect(() => {
     document.body.classList.remove("bf-railCollapsed");
@@ -24,6 +26,10 @@ export default function App() {
   useEffect(() => {
     refreshVideos();
   }, [refreshVideos]);
+
+  useEffect(() => {
+    loadFavorites();
+  }, [user?.id, loadFavorites]);
 
   return (
     <>
