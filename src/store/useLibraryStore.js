@@ -3,7 +3,9 @@ import useAuth from "./useAuth.js";
 import useAdminPanel from "./useAdminPanel.js";
 
 const API_BASE =
-  import.meta.env?.VITE_API_URL || process.env.VITE_API_URL || "http://localhost:4000";
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+  (typeof process !== "undefined" && process.env?.VITE_API_URL) ||
+  "http://localhost:4000";
 
 /** Storage keys */
 const KEY_FAVORITES = "bf_favs_v1";

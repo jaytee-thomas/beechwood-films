@@ -71,3 +71,30 @@ Persistent data lives in the SQLite database at `server/data/app.db` (created au
 
 - Update `index.html` meta tags as needed (Open Graph/Twitter tags point to `/og-cover.svg` which you can swap with your own artwork).
 - Drop in your analytics snippet (e.g. Plausible, PostHog) in `index.html` if you want traffic insights—keep it behind consent if you’re subject to privacy regulations.
+
+## Deployment
+
+### Frontend (Vercel)
+
+1. Push your latest changes to GitHub.
+2. In Vercel, create a project from this repo.
+3. Under **Settings → Environment Variables**, add `VITE_API_URL` pointing to the backend URL (e.g. `https://api.beechwoodfilms.com`).
+4. Deploy; Vercel uses `npm install && npm run build`.
+
+### Backend (Railway example)
+
+1. Create a new Railway project and deploy this repo or use the CLI.
+2. Configure env vars:
+   - `PORT` (Railway injects one; keep default or override to 4000).
+   - `CLIENT_ORIGIN` (your Vercel domain).
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_SESSION_TTL_MS`.
+   - `RESEND_API_KEY`, `NOTIFY_FROM_EMAIL` (optional).
+   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_S3_ENDPOINT` when storage is ready.
+3. Attach persistent storage (Railway Volume) for `server/data/app.db` or migrate to a managed database.
+4. Set the start command to `node server/index.js` and deploy.
+
+### Post-deploy checklist
+
+- `curl https://api.yourdomain.com/health` to confirm liveness.
+- Sign in as admin on the Vercel site; ensure videos load, favorites sync, and uploads/notifications behave.
+- ⚠️ Before using file uploads, circle back to configure Cloudflare R2 (or S3) and update the AWS env vars in both environments; then test an upload end-to-end.
