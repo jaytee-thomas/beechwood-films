@@ -11,16 +11,20 @@ dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
-const clientOrigin =
-  process.env.CLIENT_ORIGIN ||
-  (process.env.NODE_ENV === "production"
-    ? undefined
-    : "http://localhost:5173");
+const clientOrigins = (
+  process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(",") : []
+)
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-if (clientOrigin) {
+if (!clientOrigins.length && process.env.NODE_ENV !== "production") {
+  clientOrigins.push("http://localhost:5173");
+}
+
+if (clientOrigins.length) {
   app.use(
     cors({
-      origin: clientOrigin,
+      origin: clientOrigins,
       credentials: true
     })
   );

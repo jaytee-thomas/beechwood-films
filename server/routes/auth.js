@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
