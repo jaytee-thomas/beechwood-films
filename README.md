@@ -18,7 +18,7 @@ npm install
 Copy `.env.example` to `.env` and tweak values as needed:
 
 - `PORT` (default `4000`)
-- `CLIENT_ORIGIN` (front end dev server is `http://localhost:5173`)
+- `CLIENT_ORIGIN` (front end dev server is `http://localhost:5173`; use a comma-separated list for multiple origins)
 - `VITE_API_URL` (URL the React app will call – usually `http://localhost:4000` in dev)
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` (seed credentials for your admin account)
 - `ADMIN_SESSION_TTL_MS` (session lifetime in ms, default 6 hours)
@@ -86,7 +86,7 @@ Persistent data lives in the SQLite database at `server/data/app.db` (created au
 1. Create a new Railway project and deploy this repo or use the CLI.
 2. Configure env vars:
    - `PORT` (Railway injects one; keep default or override to 4000).
-   - `CLIENT_ORIGIN` (your Vercel domain).
+   - `CLIENT_ORIGIN` (your Vercel domain; list multiple domains separated by commas when needed).
    - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_SESSION_TTL_MS`.
    - `RESEND_API_KEY`, `NOTIFY_FROM_EMAIL` (optional).
    - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_S3_ENDPOINT` when storage is ready.

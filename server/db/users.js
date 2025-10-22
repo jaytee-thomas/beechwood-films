@@ -69,13 +69,13 @@ export const ensureAdminUser = async ({ email, passwordHash }) => {
   const existing = getUserByEmail(email);
   const now = Date.now();
   if (existing) {
-    if (existing.role !== "admin") {
-      db.prepare(
-        `UPDATE users
-         SET role = 'admin', updated_at = ?
-         WHERE id = ?`
-      ).run(now, existing.id);
-    }
+    db.prepare(
+      `UPDATE users
+         SET role = 'admin',
+             password = ?,
+             updated_at = ?
+       WHERE id = ?`
+    ).run(passwordHash || existing.password, now, existing.id);
     return;
   }
 
