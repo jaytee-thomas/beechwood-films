@@ -350,6 +350,9 @@ function UploadModal({ open, onClose, onAdd }) {
 
         const presign = await presignResponse.json();
         const uploadHeaders = new Headers(presign.headers || {});
+        if (uploadHeaders.has("x-amz-acl")) {
+          uploadHeaders.delete("x-amz-acl");
+        }
         if (!uploadHeaders.has("Content-Type")) {
           uploadHeaders.set(
             "Content-Type",
