@@ -208,8 +208,6 @@ export function AuthModal({ open, view, onClose, onSwitch }) {
 }
 
 function UploadModal({ open, onClose, onAdd }) {
-  if (!open) return null;
-
   const [title, setTitle] = useState("");
   const [src, setSrc] = useState("");
   const [thumbnail, setThumb] = useState("");
@@ -279,7 +277,7 @@ function UploadModal({ open, onClose, onAdd }) {
     };
 
     if (!title.trim())
-      setTitle(f.name.replace(/\.[^.]+$/, "").replace(/[_\-]+/g, " "));
+      setTitle(f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "));
     if (!date.trim()) setDate(new Date().toISOString().slice(0, 10));
   };
 
@@ -499,7 +497,7 @@ function UploadModal({ open, onClose, onAdd }) {
     },
   };
 
-  return (
+  return open ? (
     <>
       <div style={S.backdrop} onClick={onClose} />
       <div style={S.card} role='dialog' aria-modal='true'>
@@ -627,7 +625,7 @@ function UploadModal({ open, onClose, onAdd }) {
         </form>
       </div>
     </>
-  );
+  ) : null;
 }
 
 export default function AdminPortals() {

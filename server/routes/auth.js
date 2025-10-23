@@ -23,7 +23,7 @@ const router = Router();
 
 const sanitizeUser = (user) => {
   if (!user) return null;
-  const { password, ...rest } = user;
+  const { password: _password, ...rest } = user;
   return rest;
 };
 
