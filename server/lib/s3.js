@@ -5,7 +5,9 @@ const {
   AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY,
   AWS_REGION,
-  AWS_S3_BUCKET
+  AWS_S3_BUCKET,
+  AWS_S3_ENDPOINT,
+  AWS_S3_FORCE_PATH_STYLE
 } = process.env;
 
 let client = null;
@@ -15,8 +17,15 @@ export const getS3Client = () => {
     return null;
   }
   if (!client) {
+    const endpoint = AWS_S3_ENDPOINT ? AWS_S3_ENDPOINT.replace(/\/+$/, "") : undefined;
+    const forcePathStyle = AWS_S3_FORCE_PATH_STYLE
+      ? AWS_S3_FORCE_PATH_STYLE === "true"
+      : Boolean(endpoint);
+
     client = new S3Client({
       region: AWS_REGION,
+      ...(endpoint ? { endpoint } : {}),
+      forcePathStyle,
       credentials: {
         accessKeyId: AWS_ACCESS_KEY_ID,
         secretAccessKey: AWS_SECRET_ACCESS_KEY
@@ -46,8 +55,8 @@ export const createPresignedUpload = async ({
   const uploadUrl = await getSignedUrl(s3, command, { expiresIn });
 
   let fileUrl;
-  if (process.env.AWS_S3_ENDPOINT) {
-    const endpoint = process.env.AWS_S3_ENDPOINT.replace(/\/+$/, "");
+  if (AWS_S3_ENDPOINT) {
+    const endpoint = AWS_S3_ENDPOINT.replace(/\/+$/, "");
     fileUrl = `${endpoint}/${AWS_S3_BUCKET}/${key}`;
   } else {
     fileUrl = `https://${AWS_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`;
@@ -55,4 +64,3 @@ export const createPresignedUpload = async ({
 
   return { uploadUrl, fileUrl, bucket: AWS_S3_BUCKET, key };
 };
-
