@@ -59,8 +59,6 @@ const FALLBACK_REEL_DURATIONS = ["0:45", "0:38", "0:52"];
    Player Overlay (inline styles)
 ------------------------- */
 function PlayerOverlay({ video, onClose }) {
-  if (!video) return null;
-
   const isYouTube = (url = "") =>
     /youtube\.com\/watch\?v=|youtu\.be\//i.test(url);
   const isVimeo = (url = "") => /vimeo\.com\/\d+/i.test(url);
@@ -75,10 +73,13 @@ function PlayerOverlay({ video, onClose }) {
   };
 
   useEffect(() => {
+    if (!video) return undefined;
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, video]);
+
+  if (!video) return null;
 
   const src = video.src || "";
   const canNativeVideo =
@@ -586,7 +587,7 @@ export default function Library({
     let text = raw;
 
     const extractHandle = (input) => {
-      const matchHandle = input.match(/@[\w.\-]+/);
+      const matchHandle = input.match(/@[\w.-]+/);
       if (matchHandle) return matchHandle[0].replace(/^@+/, "");
       const cleaned = input
         .replace(/^https?:\/\/(www\.)?/i, "")
@@ -617,7 +618,7 @@ export default function Library({
       }
       text = `@${handle}`;
     } else {
-      const match = raw.match(/@[\w.\-]+/);
+      const match = raw.match(/@[\w.-]+/);
       if (match) text = match[0];
       else {
         const handle = extractHandle(raw);
@@ -628,7 +629,7 @@ export default function Library({
     return { label, text, href };
   };
 
-  const showcaseVideos = useMemo(() => [], [videos, search]);
+  const showcaseVideos = useMemo(() => [], []);
   const showcaseCards = useMemo(
     () =>
       showcaseVideos.map((video) => {
@@ -667,7 +668,6 @@ export default function Library({
       }),
     [showcaseVideos]
   );
-  const reelCards = useMemo(() => [], [videos, enrichReel]);
   const socialLinks = useMemo(() => {
     const links = [];
     const push = (platform, label, value) => {
@@ -763,7 +763,14 @@ export default function Library({
       );
     }
     return list;
-  }, [videos, activeSection, favorites, search, mode]);
+  }, [videos, activeSection, favorites, search]);
+
+  const reelCards = useMemo(() => {
+    return (videos || [])
+      .filter((video) => (video.library || "").toLowerCase() === "reels")
+      .slice(0, 6)
+      .map((video, index) => enrichReel(video, index));
+  }, [videos, enrichReel]);
 
   const reelsPageCards = useMemo(() => {
     if (activeSection !== "reels") return [];
@@ -991,7 +998,28 @@ export default function Library({
                 <h2 className='bf-showcase__title'>Reels Library</h2>
                 <p className='bf-showcase__subtitle'>Add reels to your library to see them here.</p>
               </div>
-              <div className='bf-showcase__empty'>No reels in your library yet.</div>
+              {reelsPageCards.length > 0 ? (
+                <div className='bf-showcase__row'>
+                  {reelsPageCards.map((video) => (
+                    <ReelsCard
+                      key={`reel-${video.id}`}
+                      video={video}
+                      isFavorite={favorites.includes(video.id)}
+                      showDelete={isAdmin && isLibraryVideo(video)}
+                      onPlay={setPlaying}
+                      onToggleFavorite={(videoItem) => {
+                        if (typeof toggleFavorite === "function")
+                          toggleFavorite(videoItem.id);
+                      }}
+                      onDelete={requestDelete}
+                      onShare={shareVideo}
+                      stats={video.stats}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className='bf-showcase__empty'>No reels in your library yet.</div>
+              )}
             </section>
           ) : activeSection === "vids" ? (
             <section className='bf-showcase bf-showcase--vids' aria-label='Vids library'>

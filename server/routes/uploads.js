@@ -1,7 +1,6 @@
 import { Router } from "express";
 import crypto from "crypto";
 import path from "path";
-import { fileURLToPath } from "url";
 import { requireAdmin } from "../middleware/requireAdmin.js";
 import { createPresignedUpload, getS3Client } from "../lib/s3.js";
 
@@ -68,4 +67,3 @@ router.post("/presign", requireAdmin, async (req, res) => {
 });
 
 export default router;
-
