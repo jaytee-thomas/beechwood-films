@@ -56,8 +56,7 @@ router.post("/presign", requireAdmin, async (req, res) => {
       key,
       method: "PUT",
       headers: {
-        "Content-Type": contentType,
-        "x-amz-acl": "public-read"
+        "Content-Type": contentType
       }
     });
   } catch (error) {
