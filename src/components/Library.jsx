@@ -629,44 +629,44 @@ export default function Library({
     return { label, text, href };
   };
 
-  const showcaseVideos = useMemo(() => [], []);
+  const enrichVideo = useCallback((video) => {
+    const thumbnail = video.thumbnail || video.poster || null;
+    const durationLabel =
+      video.duration || video.runtime || video.metrics?.runtime || null;
+    const publishedAt =
+      video.date || video.postedAt || video.createdAt || video.updatedAt || null;
+    const ageLabel = publishedAt ? formatAge(publishedAt) : undefined;
+    const stats =
+      durationLabel || ageLabel
+        ? {
+            views: durationLabel || undefined,
+            age: ageLabel,
+          }
+        : null;
+
+    return {
+      ...video,
+      thumbnail,
+      stats,
+      __fromLibrary: Boolean(video.source) || typeof video.id === "number",
+    };
+  }, []);
+
+  const showcaseVideos = useMemo(() => {
+    if (!Array.isArray(videos)) return [];
+    return [...videos]
+      .filter((video) => (video.library || "").toLowerCase() !== "reels")
+      .sort(
+        (a, b) =>
+          (Number(b.createdAt) || new Date(b.date || 0).getTime()) -
+          (Number(a.createdAt) || new Date(a.date || 0).getTime())
+      )
+      .slice(0, 4);
+  }, [videos]);
+
   const showcaseCards = useMemo(
-    () =>
-      showcaseVideos.map((video) => {
-        const rawViews =
-          video.stats?.views ??
-          video.views ??
-          video.playCount ??
-          video.metrics?.views ??
-          null;
-        const viewsLabel = Number.isFinite(Number(rawViews))
-          ? formatViews(Number(rawViews))
-          : rawViews || undefined;
-        const ageSource =
-          video.stats?.ageSource ||
-          video.postedAt ||
-          video.date ||
-          video.createdAt;
-        const ageLabel =
-          typeof video.stats?.age === "string"
-            ? video.stats.age
-            : ageSource
-            ? formatAge(ageSource)
-            : undefined;
-        const stats =
-          viewsLabel || ageLabel
-            ? {
-                views: viewsLabel,
-                age: ageLabel,
-              }
-            : undefined;
-        return {
-          ...video,
-          stats,
-          __fromLibrary: true,
-        };
-      }),
-    [showcaseVideos]
+    () => showcaseVideos.map((video) => enrichVideo(video)),
+    [showcaseVideos, enrichVideo]
   );
   const socialLinks = useMemo(() => {
     const links = [];
@@ -768,6 +768,11 @@ export default function Library({
   const reelCards = useMemo(() => {
     return (videos || [])
       .filter((video) => (video.library || "").toLowerCase() === "reels")
+      .sort(
+        (a, b) =>
+          (Number(b.createdAt) || new Date(b.date || 0).getTime()) -
+          (Number(a.createdAt) || new Date(a.date || 0).getTime())
+      )
       .slice(0, 6)
       .map((video, index) => enrichReel(video, index));
   }, [videos, enrichReel]);
@@ -783,12 +788,29 @@ export default function Library({
 
   const vidsPageCards = useMemo(() => {
     if (activeSection !== "vids") return [];
-    return filtered.map((video) => ({ ...video }));
-  }, [activeSection, filtered]);
+    return filtered.map((video) => enrichVideo(video));
+  }, [activeSection, filtered, enrichVideo]);
+
   const favoritesPageCards = useMemo(() => {
     if (activeSection !== "favorites") return [];
-    return filtered.map((video) => ({ ...video }));
-  }, [activeSection, filtered]);
+    return filtered.map((video, index) => {
+      const type = (video.library || "").toLowerCase() === "reels" ? "reel" : "video";
+      return {
+        type,
+        data: type === "reel" ? enrichReel(video, index) : enrichVideo(video),
+      };
+    });
+  }, [activeSection, filtered, enrichReel, enrichVideo]);
+
+  const mixedCards = useMemo(() => {
+    return filtered.map((video, index) => {
+      const type = (video.library || "").toLowerCase() === "reels" ? "reel" : "video";
+      return {
+        type,
+        data: type === "reel" ? enrichReel(video, index) : enrichVideo(video),
+      };
+    });
+  }, [filtered, enrichReel, enrichVideo]);
 
   const isLibraryVideo = useCallback(
     (video) => Boolean(video) && (typeof video.id === "number" || video.source === "custom" || video.__fromLibrary),
@@ -873,55 +895,63 @@ export default function Library({
                 </button>
               )}
               <div className='bf-aboutWallpaperContent'>
-                <div className='bf-aboutPrimary'>
-                  <div className='bf-aboutPrimaryText'>
-                    <span className='bf-aboutPrimaryHandle'>{aboutHandle}</span>
-                    <h1>{profile?.name || "Add your name"}</h1>
-                    <p className='bf-aboutPrimarySubline'>Based in {hometownDisplay}</p>
+                <section className='bf-aboutSection is-full' aria-label='About profile'>
+                  <div className='bf-aboutProfileCard'>
+                    <div className='bf-aboutAvatarFlow'>
+                      <img
+                        src={profilePhoto}
+                        alt={`${profile?.name || "Profile"} portrait`}
+                      />
+                    </div>
+                    <div className='bf-aboutProfileStack'>
+                      <span className='bf-aboutPrimaryHandle'>{aboutHandle}</span>
+                      <h1 className='bf-aboutName'>{profile?.name || "Add your name"}</h1>
+                      <p className='bf-aboutSubline'>Based in {hometownDisplay}</p>
+                    </div>
                   </div>
-                </div>
-                <div className='bf-aboutInfoBlocks'>
-                  <section aria-label='Bio'>
-                    <h3>Bio</h3>
-                    <p>{profileBio || "Use the edit button to tell your story."}</p>
-                  </section>
-                  <section aria-label='Contact Information'>
-                    <h3>Contact</h3>
-                    <ul className='bf-aboutInfoList'>
-                      {contactItems.map((item) => (
-                        <li key={item.label}>
-                          <span className='bf-aboutInfoLabel'>{item.label}</span>
-                          {item.value ? (
-                            item.href ? (
-                              <a href={item.href}>{item.value}</a>
+                  <div className='bf-aboutColumnsFlow'>
+                    <section aria-label='Bio card'>
+                      <h3>Bio</h3>
+                      <p>{profileBio || "Use the edit button to tell your story."}</p>
+                    </section>
+                    <section aria-label='Contact information'>
+                      <h3>Contact</h3>
+                      <ul>
+                        {contactItems.map((item) => (
+                          <li key={item.label}>
+                            <span>{item.label}</span>
+                            {item.value ? (
+                              item.href ? (
+                                <a href={item.href}>{item.value}</a>
+                              ) : (
+                                <span>{item.value}</span>
+                              )
                             ) : (
-                              <span>{item.value}</span>
-                            )
-                          ) : (
-                            <span className='bf-aboutPlaceholder'>{item.placeholder}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                  <section aria-label='Social links'>
-                    <h3>Social</h3>
-                    {socialLinks.length > 0 ? (
-                      <ul className='bf-aboutInfoList'>
-                        {socialLinks.map((link) => (
-                          <li key={link.label}>
-                            <span className='bf-aboutInfoLabel'>{link.label}</span>
-                            <a href={link.href} target='_blank' rel='noreferrer noopener'>
-                              {link.text}
-                            </a>
+                              <span className='bf-aboutPlaceholder'>{item.placeholder}</span>
+                            )}
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <span className='bf-aboutPlaceholder'>{aboutHandle}</span>
-                    )}
-                  </section>
-                </div>
+                    </section>
+                    <section aria-label='Social links'>
+                      <h3>Social</h3>
+                      {socialLinks.length > 0 ? (
+                        <ul>
+                          {socialLinks.map((link) => (
+                            <li key={link.label}>
+                              <span>{link.label}</span>
+                              <a href={link.href} target='_blank' rel='noreferrer noopener'>
+                                {link.text}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className='bf-aboutPlaceholder'>{aboutHandle}</span>
+                      )}
+                    </section>
+                  </div>
+                </section>
               </div>
             </section>
           ) : activeSection === "home" ? (
@@ -1034,6 +1064,7 @@ export default function Library({
                       key={`vid-${video.id}`}
                       video={video}
                       variant='doc'
+                      stats={video.stats}
                       showDelete={isAdmin && isLibraryVideo(video)}
                       onDelete={requestDelete}
                       onPlay={setPlaying}
@@ -1059,21 +1090,40 @@ export default function Library({
               </div>
               {favoritesPageCards.length > 0 ? (
                 <div className='bf-showcase__row'>
-                  {favoritesPageCards.map((video) => (
-                    <MCard
-                      key={`fav-${video.id}`}
-                      video={video}
-                      variant='doc'
-                      showDelete={isAdmin && isLibraryVideo(video)}
-                      onDelete={requestDelete}
-                      onPlay={setPlaying}
-                      isFavorite
-                      onToggleFavorite={(videoItem) => {
-                        if (typeof toggleFavorite === "function")
-                          toggleFavorite(videoItem.id);
-                      }}
-                    />
-                  ))}
+                  {favoritesPageCards.map((item) =>
+                    item.type === "reel" ? (
+                      <ReelsCard
+                        key={`fav-reel-${item.data.id}`}
+                        video={item.data}
+                        isFavorite
+                        showDelete={isAdmin && isLibraryVideo(item.data)}
+                        onDelete={requestDelete}
+                        onPlay={setPlaying}
+                        onToggleFavorite={(videoItem) => {
+                          if (typeof toggleFavorite === "function")
+                            toggleFavorite(videoItem.id);
+                        }}
+                        onShare={shareVideo}
+                        stats={item.data.stats}
+                      />
+                    ) : (
+                      <MCard
+                        key={`fav-vid-${item.data.id}`}
+                        video={item.data}
+                        variant='doc'
+                        showDelete={isAdmin && isLibraryVideo(item.data)}
+                        onDelete={requestDelete}
+                        onPlay={setPlaying}
+                        isFavorite
+                        onToggleFavorite={(videoItem) => {
+                          if (typeof toggleFavorite === "function")
+                            toggleFavorite(videoItem.id);
+                        }}
+                        onShare={shareVideo}
+                        stats={item.data.stats}
+                      />
+                    )
+                  )}
                 </div>
               ) : (
                 <div className='bf-showcase__empty'>You haven’t favorited any videos yet.</div>
@@ -1081,24 +1131,41 @@ export default function Library({
             </section>
           ) : (
             <div id='library-grid' className='bf-grid'>
-              {filtered.length === 0 ? (
+              {mixedCards.length === 0 ? (
                 <div className='bf-empty'>No videos found.</div>
               ) : (
-                filtered.map((v) => {
-                  const favOn = favorites.includes(v.id);
-                  return (
-                    <MCard
-                      key={v.id}
-                      video={v}
-                      variant='doc'
+                mixedCards.map((item) => {
+                  const isFav = favorites.includes(item.data.id);
+                  return item.type === "reel" ? (
+                    <ReelsCard
+                      key={`grid-reel-${item.data.id}`}
+                      video={item.data}
+                      isFavorite={isFav}
+                      showDelete={isAdmin && isLibraryVideo(item.data)}
+                      onDelete={requestDelete}
                       onPlay={setPlaying}
-                      isFavorite={favOn}
-                      showDelete={isAdmin && isLibraryVideo(v)}
+                      onToggleFavorite={(videoItem) => {
+                        if (typeof toggleFavorite === "function")
+                          toggleFavorite(videoItem.id);
+                      }}
+                      onShare={shareVideo}
+                      stats={item.data.stats}
+                    />
+                  ) : (
+                    <MCard
+                      key={`grid-vid-${item.data.id}`}
+                      video={item.data}
+                      variant='doc'
+                      stats={item.data.stats}
+                      onPlay={setPlaying}
+                      isFavorite={isFav}
+                      showDelete={isAdmin && isLibraryVideo(item.data)}
                       onDelete={requestDelete}
                       onToggleFavorite={(videoItem) => {
                         if (typeof toggleFavorite === "function")
                           toggleFavorite(videoItem.id);
                       }}
+                      onShare={shareVideo}
                     />
                   );
                 })
