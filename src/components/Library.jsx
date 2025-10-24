@@ -7,6 +7,105 @@ import MCard from "./MCard.jsx";
 import ReelsCard from "./ReelsCard.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 
+const YOUTUBE_PATTERNS = [
+  /youtu\.be\/([^?&/]+)/i,
+  /youtube\.com\/watch\?v=([^&]+)/i,
+  /youtube\.com\/embed\/([^?&/]+)/i,
+  /youtube\.com\/shorts\/([^?&/]+)/i,
+  /youtube\.com\/live\/([^?&/]+)/i,
+];
+
+const VIMEO_PATTERNS = [
+  /vimeo\.com\/(?:video\/)?(\d+)/i,
+  /player\.vimeo\.com\/video\/(\d+)/i,
+];
+
+const VIDEO_MIME_TYPES = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  ogv: "video/ogg",
+  ogg: "video/ogg",
+  mkv: "video/x-matroska",
+  avi: "video/x-msvideo",
+  wmv: "video/x-ms-wmv",
+  flv: "video/x-flv",
+  f4v: "video/x-f4v",
+  mpg: "video/mpeg",
+  mpeg: "video/mpeg",
+  mp2: "video/mpeg",
+  ts: "video/mp2t",
+  m2ts: "video/mp2t",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  m3u8: "application/x-mpegURL",
+  mpd: "application/dash+xml",
+};
+
+const isYouTube = (url = "") => YOUTUBE_PATTERNS.some((pattern) => pattern.test(url));
+const isVimeo = (url = "") => VIMEO_PATTERNS.some((pattern) => pattern.test(url));
+
+const getYouTubeId = (url = "") => {
+  for (const pattern of YOUTUBE_PATTERNS) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  return "";
+};
+
+const getVimeoId = (url = "") => {
+  for (const pattern of VIMEO_PATTERNS) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  return "";
+};
+
+const parseTimecode = (value = "") => {
+  if (!value) return Number.NaN;
+  if (/^\d+$/.test(value)) return Number(value);
+  const match = value.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/i);
+  if (!match) return Number.NaN;
+  const hours = match[1] ? Number(match[1]) : 0;
+  const minutes = match[2] ? Number(match[2]) : 0;
+  const seconds = match[3] ? Number(match[3]) : 0;
+  return hours * 3600 + minutes * 60 + seconds;
+};
+
+const inferExtension = (url = "") => {
+  if (!url) return "";
+  const clean = url.split("?")[0].split("#")[0];
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  return match ? match[1].toLowerCase() : "";
+};
+
+const inferMimeFromExtension = (ext = "") => {
+  if (!ext) return undefined;
+  return VIDEO_MIME_TYPES[ext];
+};
+
+const inferMimeFromQuery = (url = "") => {
+  try {
+    const base =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "http://localhost";
+    const parsed = new URL(url, base);
+    const param =
+      parsed.searchParams.get("contentType") ||
+      parsed.searchParams.get("ContentType") ||
+      parsed.searchParams.get("mime") ||
+      parsed.searchParams.get("MimeType");
+    if (param && param.toLowerCase().startsWith("video/")) {
+      return param;
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+  return undefined;
+};
+
 const formatViews = (count) => {
   if (count == null || Number.isNaN(count)) return "--";
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M views`;
@@ -59,104 +158,6 @@ const FALLBACK_REEL_DURATIONS = ["0:45", "0:38", "0:52"];
    Player Overlay (inline styles)
 ------------------------- */
 function PlayerOverlay({ video, onClose }) {
-  const YOUTUBE_PATTERNS = [
-    /youtu\.be\/([^?&/]+)/i,
-    /youtube\.com\/watch\?v=([^&]+)/i,
-    /youtube\.com\/embed\/([^?&/]+)/i,
-    /youtube\.com\/shorts\/([^?&/]+)/i,
-    /youtube\.com\/live\/([^?&/]+)/i,
-  ];
-  const VIMEO_PATTERNS = [
-    /vimeo\.com\/(?:video\/)?(\d+)/i,
-    /player\.vimeo\.com\/video\/(\d+)/i,
-  ];
-
-  const isYouTube = (url = "") => YOUTUBE_PATTERNS.some((pattern) => pattern.test(url));
-  const isVimeo = (url = "") => VIMEO_PATTERNS.some((pattern) => pattern.test(url));
-
-  const getYouTubeId = (url = "") => {
-    for (const pattern of YOUTUBE_PATTERNS) {
-      const match = url.match(pattern);
-      if (match && match[1]) return match[1];
-    }
-    return "";
-  };
-
-  const getVimeoId = (url = "") => {
-    for (const pattern of VIMEO_PATTERNS) {
-      const match = url.match(pattern);
-      if (match && match[1]) return match[1];
-    }
-    return "";
-  };
-
-  const parseTimecode = (value = "") => {
-    if (!value) return Number.NaN;
-    if (/^\d+$/.test(value)) return Number(value);
-    const match = value.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/i);
-    if (!match) return Number.NaN;
-    const hours = match[1] ? Number(match[1]) : 0;
-    const minutes = match[2] ? Number(match[2]) : 0;
-    const seconds = match[3] ? Number(match[3]) : 0;
-    return hours * 3600 + minutes * 60 + seconds;
-  };
-
-  const VIDEO_MIME_TYPES = {
-    mp4: "video/mp4",
-    m4v: "video/mp4",
-    mov: "video/quicktime",
-    webm: "video/webm",
-    ogv: "video/ogg",
-    ogg: "video/ogg",
-    mkv: "video/x-matroska",
-    avi: "video/x-msvideo",
-    wmv: "video/x-ms-wmv",
-    flv: "video/x-flv",
-    f4v: "video/x-f4v",
-    mpg: "video/mpeg",
-    mpeg: "video/mpeg",
-    mp2: "video/mpeg",
-    ts: "video/mp2t",
-    m2ts: "video/mp2t",
-    3gp: "video/3gpp",
-    3g2: "video/3gpp2",
-    m3u8: "application/x-mpegURL",
-    mpd: "application/dash+xml",
-  };
-
-  const inferExtension = (url = "") => {
-    if (!url) return "";
-    const clean = url.split("?")[0].split("#")[0];
-    const match = clean.match(/\.([a-z0-9]+)$/i);
-    return match ? match[1].toLowerCase() : "";
-  };
-
-  const inferMimeFromExtension = (ext = "") => {
-    if (!ext) return undefined;
-    return VIDEO_MIME_TYPES[ext];
-  };
-
-  const inferMimeFromQuery = (url = "") => {
-    try {
-      const base =
-        typeof window !== "undefined" && window.location?.origin
-          ? window.location.origin
-          : "http://localhost";
-      const parsed = new URL(url, base);
-      const param =
-        parsed.searchParams.get("contentType") ||
-        parsed.searchParams.get("ContentType") ||
-        parsed.searchParams.get("mime") ||
-        parsed.searchParams.get("MimeType");
-      if (param && param.toLowerCase().startsWith("video/")) {
-        return param;
-      }
-    } catch {
-      /* ignore malformed URLs */
-    }
-    return undefined;
-  };
-
   const sources = useMemo(() => {
     const map = new Map();
     const push = (value, typeHint) => {
@@ -383,34 +384,35 @@ function PlayerOverlay({ video, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, video]);
 
-  if (!video) return null;
+  const hasVideo = Boolean(video);
+  const videoData = video || {};
 
-  const tagTokens = Array.isArray(video.tags)
-    ? video.tags.filter((tag) => typeof tag === "string").join(" ").toLowerCase()
-    : typeof video.tags === "string"
-    ? video.tags.toLowerCase()
+  const tagTokens = Array.isArray(videoData.tags)
+    ? videoData.tags.filter((tag) => typeof tag === "string").join(" ").toLowerCase()
+    : typeof videoData.tags === "string"
+    ? videoData.tags.toLowerCase()
     : "";
   const descriptorTokens = [
-    video.library,
-    video.variant,
-    video.type,
-    video.kind,
-    video.category,
+    videoData.library,
+    videoData.variant,
+    videoData.type,
+    videoData.kind,
+    videoData.category,
   ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  const aspectTokens = String(video.aspectRatio || video.aspect || "")
+  const aspectTokens = String(videoData.aspectRatio || videoData.aspect || "")
     .toLowerCase()
     .replace(/\s+/g, "");
-  const orientationToken = (video.orientation || "").toLowerCase();
+  const orientationToken = (videoData.orientation || "").toLowerCase();
 
   const isVerticalAspect =
     aspectTokens.includes("9/16") ||
     aspectTokens.includes("9:16") ||
     aspectTokens.includes("9x16");
   const isReel =
-    Boolean(video.isReel) ||
+    Boolean(videoData.isReel) ||
     descriptorTokens.includes("reel") ||
     tagTokens.includes("reel") ||
     isVerticalAspect ||
@@ -450,12 +452,16 @@ function PlayerOverlay({ video, onClose }) {
       ? nativeSources[Math.min(activeNativeIndex, nativeSources.length - 1)]
       : null;
   const poster =
-    video.poster ||
-    video.posterUrl ||
-    video.thumbnail ||
-    video.thumb ||
-    video.previewImage ||
+    videoData.poster ||
+    videoData.posterUrl ||
+    videoData.thumbnail ||
+    videoData.thumb ||
+    videoData.previewImage ||
     "";
+
+  if (!hasVideo) {
+    return null;
+  }
 
   const backdropStyle = {
     position: "fixed",
@@ -659,10 +665,10 @@ function PlayerOverlay({ video, onClose }) {
           )}
         </div>
         <div style={metaStyle}>
-          <h3 style={titleStyle}>{video.title}</h3>
+          <h3 style={titleStyle}>{videoData.title}</h3>
           <div style={infoStyle}>
-            <span>{video.date || "--"}</span>
-            <span>{video.duration || "--"}</span>
+            <span>{videoData.date || "--"}</span>
+            <span>{videoData.duration || "--"}</span>
           </div>
         </div>
       </div>
