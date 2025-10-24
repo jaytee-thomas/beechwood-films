@@ -45,7 +45,15 @@ app.use("/api/uploads", uploadsRouter);
 
 app.use((err, req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: "Something went wrong" });
+  const status = Number(err.status || err.statusCode) || 500;
+  const payload = {
+    error: status === 500 ? "Something went wrong" : err.message || "Request failed"
+  };
+  if (process.env.NODE_ENV !== "production" && err?.stack) {
+    payload.details = err.message;
+    payload.stack = err.stack;
+  }
+  res.status(status).json(payload);
 });
 
 const start = async () => {

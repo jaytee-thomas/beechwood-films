@@ -14,7 +14,9 @@ const router = Router();
 
 const normalizeTags = (tags) => {
   if (!tags) return [];
-  if (Array.isArray(tags)) return tags;
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => String(tag).trim()).filter(Boolean);
+  }
   if (typeof tags === "string") {
     return tags
       .split(",")
@@ -24,18 +26,37 @@ const normalizeTags = (tags) => {
   return [];
 };
 
+const LIBRARY_ALIASES = {
+  vids: "Videos",
+  videos: "Videos",
+  video: "Videos",
+  reels: "Reels",
+  reel: "Reels",
+  shorts: "Reels",
+  short: "Reels",
+  docs: "Documentaries",
+  documentaries: "Documentaries",
+  documentary: "Documentaries"
+};
+
+const normalizeLibrary = (value) => {
+  if (!value) return "Videos";
+  const key = String(value).trim().toLowerCase();
+  return LIBRARY_ALIASES[key] || value;
+};
+
 const buildVideo = (payload, author) => {
   const now = Date.now();
   const embedUrl = payload.embedUrl || payload.src || "";
   const provider = payload.provider || "custom";
   return {
     id: Number(payload.id) || now,
-    title: payload.title,
+    title: payload.title?.trim(),
     embedUrl,
     src: payload.src || embedUrl,
     previewSrc: payload.previewSrc || null,
     thumbnail: payload.thumbnail || "",
-    library: payload.library || "General",
+    library: normalizeLibrary(payload.library),
     provider,
     providerId:
       payload.providerId ||
@@ -45,7 +66,7 @@ const buildVideo = (payload, author) => {
     source: payload.source || "api",
     duration: payload.duration || null,
     date: payload.date || null,
-    description: payload.description || "",
+    description: payload.description?.trim() || "",
     tags: normalizeTags(payload.tags),
     fileName: payload.fileName || null,
     createdAt: payload.createdAt || now,
@@ -54,10 +75,23 @@ const buildVideo = (payload, author) => {
 };
 
 const requireFields = (body, res) => {
-  const hasEmbed = body?.embedUrl || body?.src;
-  if (!body?.title || !hasEmbed) {
+  if (!body) {
     res.status(400).json({ error: "title and embedUrl (or src) are required" });
     return false;
+  }
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const rawEmbed = typeof body.embedUrl === "string" ? body.embedUrl : body.src;
+  const embed = typeof rawEmbed === "string" ? rawEmbed.trim() : "";
+
+  if (!title || !embed) {
+    res.status(400).json({ error: "title and embedUrl (or src) are required" });
+    return false;
+  }
+  body.title = title;
+  if (body.embedUrl !== undefined) {
+    body.embedUrl = embed;
+  } else {
+    body.src = embed;
   }
   return true;
 };
@@ -95,11 +129,20 @@ router.put("/:id", requireAdmin, (req, res, next) => {
     if (!existing) {
       return res.status(404).json({ error: "Video not found" });
     }
-    const updated = updateVideoRecord(
-      id,
-      { ...req.body },
-      req.auth?.session?.user?.id
-    );
+    const updates = { ...req.body };
+    if (updates.tags !== undefined) {
+      updates.tags = normalizeTags(updates.tags);
+    }
+    if (updates.library !== undefined) {
+      updates.library = normalizeLibrary(updates.library);
+    }
+    if (typeof updates.title === "string") {
+      updates.title = updates.title.trim();
+    }
+    if (typeof updates.description === "string") {
+      updates.description = updates.description.trim();
+    }
+    const updated = updateVideoRecord(id, updates, req.auth?.session?.user?.id);
     res.json({ video: updated });
   } catch (error) {
     next(error);
