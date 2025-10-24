@@ -213,7 +213,7 @@ function UploadModal({ open, onClose, onAdd }) {
   const [thumbnail, setThumb] = useState("");
   const [duration, setDuration] = useState("");
   const [date, setDate] = useState("");
-  const [library, setLibrary] = useState("vids");
+  const [library, setLibrary] = useState("videos");
   const [tags, setTags] = useState("");
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
@@ -395,7 +395,7 @@ function UploadModal({ open, onClose, onAdd }) {
             : undefined,
         duration: duration.trim(),
         date: date.trim(),
-        library: library.trim(),
+        library: library.trim().toLowerCase(),
         tags: tags
           .split(",")
           .map((t) => t.trim())
@@ -582,9 +582,9 @@ function UploadModal({ open, onClose, onAdd }) {
                   type='button'
                   style={{
                     ...S.typeBtn,
-                    ...(library === "vids" ? S.typeActive : {}),
+                    ...(library === "videos" ? S.typeActive : {}),
                   }}
-                  onClick={() => setLibrary("vids")}
+                  onClick={() => setLibrary("videos")}
                 >
                   Vids
                 </button>
