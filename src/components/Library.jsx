@@ -59,18 +59,322 @@ const FALLBACK_REEL_DURATIONS = ["0:45", "0:38", "0:52"];
    Player Overlay (inline styles)
 ------------------------- */
 function PlayerOverlay({ video, onClose }) {
-  const isYouTube = (url = "") =>
-    /youtube\.com\/watch\?v=|youtu\.be\//i.test(url);
-  const isVimeo = (url = "") => /vimeo\.com\/\d+/i.test(url);
+  const YOUTUBE_PATTERNS = [
+    /youtu\.be\/([^?&/]+)/i,
+    /youtube\.com\/watch\?v=([^&]+)/i,
+    /youtube\.com\/embed\/([^?&/]+)/i,
+    /youtube\.com\/shorts\/([^?&/]+)/i,
+    /youtube\.com\/live\/([^?&/]+)/i,
+  ];
+  const VIMEO_PATTERNS = [
+    /vimeo\.com\/(?:video\/)?(\d+)/i,
+    /player\.vimeo\.com\/video\/(\d+)/i,
+  ];
+
+  const isYouTube = (url = "") => YOUTUBE_PATTERNS.some((pattern) => pattern.test(url));
+  const isVimeo = (url = "") => VIMEO_PATTERNS.some((pattern) => pattern.test(url));
+
   const getYouTubeId = (url = "") => {
-    const y1 = url.match(/[?&]v=([^&]+)/);
-    const y2 = url.match(/youtu\.be\/([^?]+)/);
-    return (y1 && y1[1]) || (y2 && y2[1]) || "";
+    for (const pattern of YOUTUBE_PATTERNS) {
+      const match = url.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+    return "";
   };
+
   const getVimeoId = (url = "") => {
-    const m = url.match(/vimeo\.com\/(\d+)/);
-    return (m && m[1]) || "";
+    for (const pattern of VIMEO_PATTERNS) {
+      const match = url.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+    return "";
   };
+
+  const parseTimecode = (value = "") => {
+    if (!value) return Number.NaN;
+    if (/^\d+$/.test(value)) return Number(value);
+    const match = value.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/i);
+    if (!match) return Number.NaN;
+    const hours = match[1] ? Number(match[1]) : 0;
+    const minutes = match[2] ? Number(match[2]) : 0;
+    const seconds = match[3] ? Number(match[3]) : 0;
+    return hours * 3600 + minutes * 60 + seconds;
+  };
+
+  const VIDEO_MIME_TYPES = {
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    mov: "video/quicktime",
+    webm: "video/webm",
+    ogv: "video/ogg",
+    ogg: "video/ogg",
+    mkv: "video/x-matroska",
+    avi: "video/x-msvideo",
+    wmv: "video/x-ms-wmv",
+    flv: "video/x-flv",
+    f4v: "video/x-f4v",
+    mpg: "video/mpeg",
+    mpeg: "video/mpeg",
+    mp2: "video/mpeg",
+    ts: "video/mp2t",
+    m2ts: "video/mp2t",
+    3gp: "video/3gpp",
+    3g2: "video/3gpp2",
+    m3u8: "application/x-mpegURL",
+    mpd: "application/dash+xml",
+  };
+
+  const inferExtension = (url = "") => {
+    if (!url) return "";
+    const clean = url.split("?")[0].split("#")[0];
+    const match = clean.match(/\.([a-z0-9]+)$/i);
+    return match ? match[1].toLowerCase() : "";
+  };
+
+  const inferMimeFromExtension = (ext = "") => {
+    if (!ext) return undefined;
+    return VIDEO_MIME_TYPES[ext];
+  };
+
+  const inferMimeFromQuery = (url = "") => {
+    try {
+      const base =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "http://localhost";
+      const parsed = new URL(url, base);
+      const param =
+        parsed.searchParams.get("contentType") ||
+        parsed.searchParams.get("ContentType") ||
+        parsed.searchParams.get("mime") ||
+        parsed.searchParams.get("MimeType");
+      if (param && param.toLowerCase().startsWith("video/")) {
+        return param;
+      }
+    } catch {
+      /* ignore malformed URLs */
+    }
+    return undefined;
+  };
+
+  const sources = useMemo(() => {
+    const map = new Map();
+    const push = (value, typeHint) => {
+      if (!value) return;
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed || trimmed === "about:blank") return;
+        const existing = map.get(trimmed);
+        const extension = inferExtension(trimmed);
+        const mime =
+          typeHint ||
+          existing?.type ||
+          inferMimeFromExtension(extension) ||
+          inferMimeFromQuery(trimmed);
+        if (existing) {
+          if (!existing.type && mime) existing.type = mime;
+          if (!existing.extension && extension) existing.extension = extension;
+          map.set(trimmed, existing);
+          return;
+        }
+        map.set(trimmed, {
+          url: trimmed,
+          type: mime,
+          extension,
+        });
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach((item) => push(item, typeHint));
+        return;
+      }
+      if (typeof value === "object") {
+        const objectType =
+          value.type ||
+          value.mimeType ||
+          value.mimetype ||
+          value.contentType ||
+          typeHint;
+        if (typeof value.url === "string") push(value.url, objectType);
+        if (typeof value.src === "string") push(value.src, objectType);
+        if (typeof value.href === "string") push(value.href, objectType);
+        if (Array.isArray(value.sources)) push(value.sources, objectType);
+        if (Array.isArray(value.files)) push(value.files, objectType);
+      }
+    };
+
+    const candidatePairs = [
+      [video?.src, video?.mimeType || video?.mimetype],
+      [video?.embedUrl],
+      [video?.streamUrl, video?.streamType],
+      [video?.downloadUrl, video?.downloadType],
+      [video?.fallbackSrc],
+      [video?.previewSrc],
+      [video?.hlsUrl, "application/x-mpegURL"],
+      [video?.dashUrl, "application/dash+xml"],
+      [video?.rawUrl],
+      [video?.fileUrl],
+    ];
+
+    candidatePairs.forEach(([value, hint]) => push(value, hint));
+
+    if (Array.isArray(video?.sources)) push(video.sources);
+    if (Array.isArray(video?.formats)) push(video.formats);
+    if (Array.isArray(video?.files)) push(video.files);
+    if (video?.media) push(video.media);
+    if (video?.assets) push(video.assets);
+
+    Object.entries(video || {}).forEach(([key, value]) => {
+      if (!value) return;
+      if (/(src|url)$/i.test(key) || /^(src|url)/i.test(key)) {
+        push(value);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [video]);
+
+  const nativeSources = useMemo(() => {
+    return sources
+      .map((source) => {
+        const extension = source.extension || inferExtension(source.url);
+        const type =
+          source.type ||
+          inferMimeFromExtension(extension) ||
+          inferMimeFromQuery(source.url);
+        return {
+          ...source,
+          extension,
+          type,
+        };
+      })
+      .filter((source) => {
+        const url = source.url || "";
+        if (!url) return false;
+        if (url.startsWith("blob:") || url.startsWith("data:video")) return true;
+        if (!/^https?:/i.test(url)) return false;
+        if (isYouTube(url) || isVimeo(url)) return false;
+        if (source.type && source.type.startsWith("video/")) return true;
+        if (
+          source.type === "application/x-mpegURL" ||
+          source.type === "application/vnd.apple.mpegurl" ||
+          source.type === "application/dash+xml"
+        ) {
+          return true;
+        }
+        if (source.extension && inferMimeFromExtension(source.extension)) return true;
+        return false;
+      });
+  }, [sources]);
+
+  const nativeSourcesKey = useMemo(
+    () => nativeSources.map((item) => item.url).join("|"),
+    [nativeSources]
+  );
+
+  const youtubeId = useMemo(() => {
+    if (
+      typeof video?.provider === "string" &&
+      video.provider.toLowerCase() === "youtube" &&
+      video?.providerId
+    ) {
+      return String(video.providerId);
+    }
+    for (const source of sources) {
+      const id = getYouTubeId(source.url);
+      if (id) return id;
+    }
+    return "";
+  }, [sources, video?.provider, video?.providerId]);
+
+  const youtubeReferenceUrl = useMemo(() => {
+    if (
+      typeof video?.provider === "string" &&
+      video.provider.toLowerCase() === "youtube" &&
+      typeof video?.src === "string"
+    ) {
+      return video.src;
+    }
+    const match = sources.find((source) => isYouTube(source.url));
+    return match?.url || "";
+  }, [sources, video?.provider, video?.src]);
+
+  const vimeoId = useMemo(() => {
+    if (
+      typeof video?.provider === "string" &&
+      video.provider.toLowerCase() === "vimeo" &&
+      video?.providerId
+    ) {
+      return String(video.providerId);
+    }
+    for (const source of sources) {
+      const id = getVimeoId(source.url);
+      if (id) return id;
+    }
+    return "";
+  }, [sources, video?.provider, video?.providerId]);
+
+  const vimeoReferenceUrl = useMemo(() => {
+    if (
+      typeof video?.provider === "string" &&
+      video.provider.toLowerCase() === "vimeo" &&
+      typeof video?.src === "string"
+    ) {
+      return video.src;
+    }
+    const match = sources.find((source) => isVimeo(source.url));
+    return match?.url || "";
+  }, [sources, video?.provider, video?.src]);
+
+  const youtubeEmbedUrl = useMemo(() => {
+    if (!youtubeId) return "";
+    let url = `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`;
+    if (youtubeReferenceUrl) {
+      try {
+        const parsed = new URL(
+          youtubeReferenceUrl,
+          "https://www.youtube.com/watch?v=" + youtubeId
+        );
+        const startParam = parsed.searchParams.get("t") || parsed.searchParams.get("start");
+        const playlist = parsed.searchParams.get("list");
+        if (startParam) {
+          const seconds = parseTimecode(startParam);
+          if (!Number.isNaN(seconds) && seconds > 0) {
+            url += `&start=${seconds}`;
+          }
+        }
+        if (playlist) {
+          url += `&list=${encodeURIComponent(playlist)}`;
+        }
+      } catch {
+        /* ignore malformed youtube URLs */
+      }
+    }
+    return url;
+  }, [youtubeId, youtubeReferenceUrl]);
+
+  const vimeoEmbedUrl = useMemo(() => {
+    if (!vimeoId) return "";
+    let url = `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
+    if (vimeoReferenceUrl) {
+      try {
+        const parsed = new URL(vimeoReferenceUrl, "https://vimeo.com/" + vimeoId);
+        const startParam =
+          parsed.searchParams.get("t") ||
+          parsed.hash?.replace(/^#t=/i, "") ||
+          parsed.searchParams.get("start");
+        if (startParam) {
+          const seconds = parseTimecode(startParam);
+          if (!Number.isNaN(seconds) && seconds > 0) {
+            url += `#t=${seconds}s`;
+          }
+        }
+      } catch {
+        /* ignore malformed vimeo URLs */
+      }
+    }
+    return url;
+  }, [vimeoId, vimeoReferenceUrl]);
 
   useEffect(() => {
     if (!video) return undefined;
@@ -80,12 +384,6 @@ function PlayerOverlay({ video, onClose }) {
   }, [onClose, video]);
 
   if (!video) return null;
-
-  const src = video.src || "";
-  const canNativeVideo =
-    src.startsWith("blob:") ||
-    /\.(mp4|webm|mov|m4v|ogv)(\?|$)/i.test(src) ||
-    src.startsWith("data:video");
 
   const tagTokens = Array.isArray(video.tags)
     ? video.tags.filter((tag) => typeof tag === "string").join(" ").toLowerCase()
@@ -117,6 +415,47 @@ function PlayerOverlay({ video, onClose }) {
     tagTokens.includes("reel") ||
     isVerticalAspect ||
     orientationToken === "portrait";
+
+  const hasNativeVideo = nativeSources.length > 0;
+  const [activeNativeIndex, setActiveNativeIndex] = useState(0);
+  const [playbackError, setPlaybackError] = useState(false);
+
+  useEffect(() => {
+    setActiveNativeIndex(0);
+    setPlaybackError(false);
+  }, [nativeSourcesKey, video?.id]);
+
+  const handleNativeError = useCallback(() => {
+    if (!hasNativeVideo) {
+      setPlaybackError(true);
+      return;
+    }
+    setActiveNativeIndex((current) => {
+      const next = current + 1;
+      if (next < nativeSources.length) {
+        setPlaybackError(false);
+        return next;
+      }
+      setPlaybackError(true);
+      return current;
+    });
+  }, [hasNativeVideo, nativeSources.length]);
+
+  const handleNativeLoadedData = useCallback(() => {
+    setPlaybackError(false);
+  }, []);
+
+  const currentNativeSource =
+    hasNativeVideo && nativeSources[activeNativeIndex]
+      ? nativeSources[Math.min(activeNativeIndex, nativeSources.length - 1)]
+      : null;
+  const poster =
+    video.poster ||
+    video.posterUrl ||
+    video.thumbnail ||
+    video.thumb ||
+    video.previewImage ||
+    "";
 
   const backdropStyle = {
     position: "fixed",
@@ -257,12 +596,16 @@ function PlayerOverlay({ video, onClose }) {
         height: "100%",
         background: "#000",
         border: 0,
-      };
+  };
 
   const videoStyle = {
     ...mediaCommonStyle,
     objectFit: isReel ? "cover" : "contain",
   };
+
+  const showNativePlayer = Boolean(currentNativeSource) && !playbackError;
+  const showYouTube = !showNativePlayer && Boolean(youtubeEmbedUrl);
+  const showVimeo = !showNativePlayer && !showYouTube && Boolean(vimeoEmbedUrl);
 
   return (
     <>
@@ -272,43 +615,46 @@ function PlayerOverlay({ video, onClose }) {
           <X size={20} />
         </button>
         <div style={stageStyle}>
-          {canNativeVideo ? (
+          {showNativePlayer ? (
             <video
-              src={src}
               controls
               autoPlay
               playsInline
+              preload='auto'
+              poster={poster || undefined}
+              onError={handleNativeError}
+              onLoadedData={handleNativeLoadedData}
               style={videoStyle}
-            />
-          ) : isYouTube(src) ? (
+              key={`${currentNativeSource.url}-${activeNativeIndex}`}
+              crossOrigin='anonymous'
+            >
+              <source src={currentNativeSource.url} type={currentNativeSource.type} />
+            </video>
+          ) : showYouTube ? (
             <iframe
               title={video.title}
-              src={`https://www.youtube.com/embed/${getYouTubeId(
-                src
-              )}?autoplay=1&rel=0`}
+              src={youtubeEmbedUrl}
               allow='autoplay; fullscreen; picture-in-picture'
               referrerPolicy='strict-origin-when-cross-origin'
-              style={{
-                ...mediaCommonStyle,
-                border: 0,
-              }}
+              style={{ ...mediaCommonStyle, border: 0 }}
+              allowFullScreen
             />
-          ) : isVimeo(src) ? (
+          ) : showVimeo ? (
             <iframe
               title={video.title}
-              src={`https://player.vimeo.com/video/${getVimeoId(
-                src
-              )}?autoplay=1`}
+              src={vimeoEmbedUrl}
               allow='autoplay; fullscreen; picture-in-picture'
               referrerPolicy='strict-origin-when-cross-origin'
-              style={{
-                ...mediaCommonStyle,
-                border: 0,
-              }}
+              style={{ ...mediaCommonStyle, border: 0 }}
+              allowFullScreen
             />
           ) : (
             <div style={fallbackStyle}>
-              <p>Cannot play this URL. Use MP4/WebM or a YouTube/Vimeo link.</p>
+              <p>
+                {playbackError
+                  ? "We couldn’t play any of the uploaded formats in this browser. Try uploading an MP4/WebM version or provide a streamable link."
+                  : "Cannot play this URL. Use a direct video file or a YouTube/Vimeo link."}
+              </p>
             </div>
           )}
         </div>
