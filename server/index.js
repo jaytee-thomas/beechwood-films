@@ -32,7 +32,8 @@ if (clientOrigins.length) {
   app.use(cors());
 }
 
-app.use(express.json());
+app.use(express.json({ limit: process.env.BODY_LIMIT || "10mb" }));
+app.use(express.urlencoded({ limit: process.env.BODY_LIMIT || "10mb", extended: true }));
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
