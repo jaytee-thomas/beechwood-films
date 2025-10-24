@@ -2464,6 +2464,7 @@ body {
   display: grid;
   gap: 22px;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  justify-items: stretch;
 }
 
 .bf-showcase__empty {
@@ -2473,6 +2474,13 @@ body {
   border: 1px dashed rgba(255, 255, 255, 0.12);
   text-align: center;
   color: rgba(226, 229, 255, 0.65);
+}
+
+.bf-showcase--reels .bf-showcase__row {
+  width: min(100%, calc(260px * 5 + 22px * 4));
+  margin: 0 auto;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  justify-items: start;
 }
 
 .reel-card {
@@ -2488,7 +2496,7 @@ body {
   background: rgba(9, 11, 20, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 22px 42px rgba(5, 6, 12, 0.45);
-  justify-self: center;
+  justify-self: start;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }

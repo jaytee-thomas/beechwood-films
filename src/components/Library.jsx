@@ -87,75 +87,198 @@ function PlayerOverlay({ video, onClose }) {
     /\.(mp4|webm|mov|m4v|ogv)(\?|$)/i.test(src) ||
     src.startsWith("data:video");
 
-  const S = {
-    backdrop: {
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,.7)",
-      zIndex: 4000,
-    },
-    wrap: {
-      position: "fixed",
-      inset: 0,
-      margin: "auto",
-      width: "min(1100px, 96vw)",
-      height: "min(70vh, 70dvh)",
-      background: "#0b0b0f",
-      border: "1px solid #2f3240",
-      borderRadius: 12,
-      boxShadow: "0 20px 60px rgba(0,0,0,.65)",
-      zIndex: 4001,
-      display: "grid",
-      gridTemplateRows: "1fr auto",
-      overflow: "hidden",
-    },
-    close: {
-      position: "absolute",
-      top: 8,
-      right: 8,
-      border: "1px solid #2f3240",
-      background: "#1a1b21",
-      color: "#e5e5e5",
-      borderRadius: 8,
-      padding: "6px 8px",
-      cursor: "pointer",
-      zIndex: 4002,
-    },
-    stage: { background: "#000" },
-    meta: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "10px 14px",
-      borderTop: "1px solid #20222a",
-      background: "#121218",
-    },
-    title: { margin: 0, fontSize: "1rem", fontWeight: 700, color: "#e8e8e8" },
-    info: { display: "flex", gap: 12, color: "#9aa0a6", fontSize: ".9rem" },
-    fallback: {
-      height: "100%",
-      display: "grid",
-      placeItems: "center",
-      color: "#ddd",
-      padding: 20,
-      textAlign: "center",
-    },
+  const tagTokens = Array.isArray(video.tags)
+    ? video.tags.filter((tag) => typeof tag === "string").join(" ").toLowerCase()
+    : typeof video.tags === "string"
+    ? video.tags.toLowerCase()
+    : "";
+  const descriptorTokens = [
+    video.library,
+    video.variant,
+    video.type,
+    video.kind,
+    video.category,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const aspectTokens = String(video.aspectRatio || video.aspect || "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+  const orientationToken = (video.orientation || "").toLowerCase();
+
+  const isVerticalAspect =
+    aspectTokens.includes("9/16") ||
+    aspectTokens.includes("9:16") ||
+    aspectTokens.includes("9x16");
+  const isReel =
+    Boolean(video.isReel) ||
+    descriptorTokens.includes("reel") ||
+    tagTokens.includes("reel") ||
+    isVerticalAspect ||
+    orientationToken === "portrait";
+
+  const backdropStyle = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.7)",
+    zIndex: 4000,
+  };
+
+  const wrapStyle = isReel
+    ? {
+        position: "fixed",
+        inset: 0,
+        margin: "auto",
+        width: "min(420px, 92vw, calc(min(92vh, 92dvh) * 0.52))",
+        maxWidth: 420,
+        maxHeight: "min(92vh, 92dvh)",
+        background: "#05060c",
+        border: "1px solid #2f3240",
+        borderRadius: 18,
+        boxShadow: "0 20px 60px rgba(0,0,0,.65)",
+        zIndex: 4001,
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        padding: "22px 22px 18px",
+        overflow: "hidden",
+      }
+    : {
+        position: "fixed",
+        inset: 0,
+        margin: "auto",
+        width: "min(1100px, 96vw)",
+        height: "min(70vh, 70dvh)",
+        background: "#0b0b0f",
+        border: "1px solid #2f3240",
+        borderRadius: 12,
+        boxShadow: "0 20px 60px rgba(0,0,0,.65)",
+        zIndex: 4001,
+        display: "grid",
+        gridTemplateRows: "1fr auto",
+        overflow: "hidden",
+      };
+
+  const closeStyle = isReel
+    ? {
+        position: "absolute",
+        top: 18,
+        right: 18,
+        border: "1px solid #2f3240",
+        background: "rgba(15,16,26,0.88)",
+        color: "#f5f5f5",
+        borderRadius: 999,
+        padding: "6px 8px",
+        cursor: "pointer",
+        zIndex: 4002,
+      }
+    : {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        border: "1px solid #2f3240",
+        background: "#1a1b21",
+        color: "#e5e5e5",
+        borderRadius: 8,
+        padding: "6px 8px",
+        cursor: "pointer",
+        zIndex: 4002,
+      };
+
+  const stageStyle = isReel
+    ? {
+        position: "relative",
+        width: "100%",
+        aspectRatio: "260 / 452",
+        background: "#000",
+        borderRadius: 18,
+        overflow: "hidden",
+        boxShadow: "0 18px 46px rgba(0,0,0,0.55)",
+      }
+    : { background: "#000" };
+
+  const metaStyle = isReel
+    ? {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 6,
+        padding: "0 4px 2px",
+        color: "rgba(207, 211, 244, 0.86)",
+      }
+    : {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 14px",
+        borderTop: "1px solid #20222a",
+        background: "#121218",
+      };
+
+  const titleStyle = isReel
+    ? { margin: 0, fontSize: "1.03rem", fontWeight: 700, color: "#f5f7ff" }
+    : { margin: 0, fontSize: "1rem", fontWeight: 700, color: "#e8e8e8" };
+
+  const infoStyle = isReel
+    ? { display: "flex", gap: 12, fontSize: "0.82rem", color: "rgba(167, 173, 214, 0.88)" }
+    : { display: "flex", gap: 12, color: "#9aa0a6", fontSize: ".9rem" };
+
+  const fallbackStyle = isReel
+    ? {
+        position: "absolute",
+        inset: 0,
+        display: "grid",
+        placeItems: "center",
+        color: "#ddd",
+        padding: 20,
+        textAlign: "center",
+      }
+    : {
+        height: "100%",
+        display: "grid",
+        placeItems: "center",
+        color: "#ddd",
+        padding: 20,
+        textAlign: "center",
+      };
+
+  const mediaCommonStyle = isReel
+    ? {
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        background: "#000",
+        border: 0,
+      }
+    : {
+        width: "100%",
+        height: "100%",
+        background: "#000",
+        border: 0,
+      };
+
+  const videoStyle = {
+    ...mediaCommonStyle,
+    objectFit: isReel ? "cover" : "contain",
   };
 
   return (
     <>
-      <div style={S.backdrop} onClick={onClose} />
-      <div style={S.wrap} role='dialog' aria-modal='true'>
-        <button style={S.close} onClick={onClose} aria-label='Close'>
+      <div style={backdropStyle} onClick={onClose} />
+      <div style={wrapStyle} role='dialog' aria-modal='true'>
+        <button style={closeStyle} onClick={onClose} aria-label='Close'>
           <X size={20} />
         </button>
-        <div style={S.stage}>
+        <div style={stageStyle}>
           {canNativeVideo ? (
             <video
               src={src}
               controls
               autoPlay
-              style={{ width: "100%", height: "100%", background: "#000" }}
+              playsInline
+              style={videoStyle}
             />
           ) : isYouTube(src) ? (
             <iframe
@@ -166,10 +289,8 @@ function PlayerOverlay({ video, onClose }) {
               allow='autoplay; fullscreen; picture-in-picture'
               referrerPolicy='strict-origin-when-cross-origin'
               style={{
-                width: "100%",
-                height: "100%",
+                ...mediaCommonStyle,
                 border: 0,
-                background: "#000",
               }}
             />
           ) : isVimeo(src) ? (
@@ -181,21 +302,19 @@ function PlayerOverlay({ video, onClose }) {
               allow='autoplay; fullscreen; picture-in-picture'
               referrerPolicy='strict-origin-when-cross-origin'
               style={{
-                width: "100%",
-                height: "100%",
+                ...mediaCommonStyle,
                 border: 0,
-                background: "#000",
               }}
             />
           ) : (
-            <div style={S.fallback}>
+            <div style={fallbackStyle}>
               <p>Cannot play this URL. Use MP4/WebM or a YouTube/Vimeo link.</p>
             </div>
           )}
         </div>
-        <div style={S.meta}>
-          <h3 style={S.title}>{video.title}</h3>
-          <div style={S.info}>
+        <div style={metaStyle}>
+          <h3 style={titleStyle}>{video.title}</h3>
+          <div style={infoStyle}>
             <span>{video.date || "--"}</span>
             <span>{video.duration || "--"}</span>
           </div>
@@ -554,6 +673,7 @@ export default function Library({
 
     return {
       ...video,
+      isReel: true,
       poster,
       duration,
       creator: video.creator || video.channel || "Beechwood Reels",
