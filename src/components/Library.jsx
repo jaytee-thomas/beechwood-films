@@ -154,6 +154,31 @@ const formatAge = (value) => {
 
 const FALLBACK_REEL_DURATIONS = ["0:45", "0:38", "0:52"];
 
+const parseAspectRatioValue = (input, fallbackWidth, fallbackHeight) => {
+  if (typeof input === "number" && Number.isFinite(input) && input > 0) {
+    return input;
+  }
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    if (/^\d+(\.\d+)?$/.test(trimmed)) {
+      const direct = Number(trimmed);
+      return Number.isFinite(direct) && direct > 0 ? direct : null;
+    }
+    const parts = trimmed.split(/[:/x]/i).filter(Boolean);
+    if (parts.length === 2) {
+      const [w, h] = parts.map((part) => Number(part));
+      if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+        return w / h;
+      }
+    }
+  }
+  if (Number.isFinite(fallbackWidth) && Number.isFinite(fallbackHeight) && fallbackWidth > 0 && fallbackHeight > 0) {
+    return fallbackWidth / fallbackHeight;
+  }
+  return null;
+};
+
 /* -------------------------
    Player Overlay (inline styles)
 ------------------------- */
@@ -418,6 +443,22 @@ function PlayerOverlay({ video, onClose }) {
     isVerticalAspect ||
     orientationToken === "portrait";
 
+  const rawAspect = videoData.aspectRatio || videoData.aspect || videoData.displayAspectRatio || "";
+  const numericAspect = useMemo(
+    () =>
+      parseAspectRatioValue(
+        rawAspect,
+        Number(videoData.width ?? videoData.videoWidth),
+        Number(videoData.height ?? videoData.videoHeight)
+      ),
+    [rawAspect, videoData.height, videoData.videoHeight, videoData.width, videoData.videoWidth]
+  );
+  const defaultAspect = isVerticalAspect ? 9 / 16 : 16 / 9;
+  const stageAspect = isReel ? 260 / 452 : numericAspect || defaultAspect;
+  const stageAspectString = `${stageAspect.toFixed(4)}`;
+  const stageMaxWidthRule = isReel ? "min(420px, 92vw)" : "min(960px, 92vw)";
+  const stageMaxHeightRule = isReel ? "min(92vh, 92dvh)" : "min(82vh, 82dvh)";
+
   const hasNativeVideo = nativeSources.length > 0;
   const [activeNativeIndex, setActiveNativeIndex] = useState(0);
   const [playbackError, setPlaybackError] = useState(false);
@@ -493,15 +534,18 @@ function PlayerOverlay({ video, onClose }) {
         position: "fixed",
         inset: 0,
         margin: "auto",
-        width: "min(1100px, 96vw)",
-        height: "min(70vh, 70dvh)",
-        background: "#0b0b0f",
+        width: "clamp(320px, 96vw, 1040px)",
+        maxHeight: "min(90vh, 90dvh)",
+        background: "#05060c",
         border: "1px solid #2f3240",
-        borderRadius: 12,
-        boxShadow: "0 20px 60px rgba(0,0,0,.65)",
+        borderRadius: 18,
+        boxShadow: "0 20px 70px rgba(0,0,0,.68)",
         zIndex: 4001,
-        display: "grid",
-        gridTemplateRows: "1fr auto",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 18,
+        padding: "26px 32px 24px",
         overflow: "hidden",
       };
 
@@ -541,7 +585,19 @@ function PlayerOverlay({ video, onClose }) {
         overflow: "hidden",
         boxShadow: "0 18px 46px rgba(0,0,0,0.55)",
       }
-    : { background: "#000" };
+    : {
+        position: "relative",
+        width: stageMaxWidthRule,
+        aspectRatio: stageAspectString,
+        maxHeight: stageMaxHeightRule,
+        background: "#000",
+        borderRadius: 18,
+        overflow: "hidden",
+        boxShadow: "0 22px 60px rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      };
 
   const metaStyle = isReel
     ? {
@@ -553,21 +609,25 @@ function PlayerOverlay({ video, onClose }) {
         color: "rgba(207, 211, 244, 0.86)",
       }
     : {
+        alignSelf: "stretch",
+        width: "100%",
+        maxWidth: stageMaxWidthRule,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "space-between",
-        padding: "10px 14px",
-        borderTop: "1px solid #20222a",
-        background: "#121218",
+        gap: 14,
+        flexWrap: "wrap",
+        color: "#d8dcff",
+        padding: "0 4px 2px",
       };
 
   const titleStyle = isReel
     ? { margin: 0, fontSize: "1.03rem", fontWeight: 700, color: "#f5f7ff" }
-    : { margin: 0, fontSize: "1rem", fontWeight: 700, color: "#e8e8e8" };
+    : { margin: 0, fontSize: "1.08rem", fontWeight: 700, color: "#f5f7ff" };
 
   const infoStyle = isReel
     ? { display: "flex", gap: 12, fontSize: "0.82rem", color: "rgba(167, 173, 214, 0.88)" }
-    : { display: "flex", gap: 12, color: "#9aa0a6", fontSize: ".9rem" };
+    : { display: "flex", gap: 14, color: "rgba(207, 211, 244, 0.82)", fontSize: "0.9rem" };
 
   const fallbackStyle = isReel
     ? {
@@ -600,12 +660,15 @@ function PlayerOverlay({ video, onClose }) {
     : {
         width: "100%",
         height: "100%",
+        maxWidth: "100%",
+        maxHeight: "100%",
         background: "#000",
         border: 0,
-  };
+      };
 
   const videoStyle = {
     ...mediaCommonStyle,
+    display: "block",
     objectFit: isReel ? "cover" : "contain",
   };
 

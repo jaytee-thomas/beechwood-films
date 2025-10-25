@@ -85,6 +85,8 @@ export default function MCard({
         className='m-card__media'
         onMouseEnter={startPreview}
         onMouseLeave={stopPreview}
+        onFocus={startPreview}
+        onBlur={stopPreview}
       >
         {isPreviewing && canPreview ? (
           <video
@@ -92,6 +94,8 @@ export default function MCard({
             className='m-card__video'
             src={previewSrc}
             muted
+            loop
+            preload='metadata'
             playsInline
           />
         ) : thumbnail ? (

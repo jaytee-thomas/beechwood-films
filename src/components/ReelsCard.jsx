@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Share2, Heart, Trash2, Play } from "lucide-react";
 
 function noop() {}
@@ -13,19 +13,82 @@ export default function ReelsCard({
   showDelete = false,
   stats = null,
 }) {
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const previewRef = useRef(null);
+  const previewTimer = useRef(null);
+
   const {
     title = "Untitled Reel",
     poster,
     duration,
     creator,
   } = video;
+  const previewSrc = video.previewSrc || video.hoverSrc || video.streamPreview || video.src;
+  const canPreview = Boolean(previewSrc);
 
-  const handlePlay = () => onPlay(video);
+  useEffect(() => {
+    if (!isPreviewing || !previewRef.current) return undefined;
+    const player = previewRef.current;
+    player.currentTime = 0;
+    const start = async () => {
+      try {
+        await player.play();
+      } catch {
+        setIsPreviewing(false);
+      }
+    };
+    start();
+    previewTimer.current = setTimeout(() => {
+      player.pause();
+      setIsPreviewing(false);
+    }, 7000);
+    return () => {
+      if (previewTimer.current) clearTimeout(previewTimer.current);
+      player.pause();
+      player.currentTime = 0;
+    };
+  }, [isPreviewing]);
+
+  const startPreview = () => {
+    if (!canPreview) return;
+    setIsPreviewing(true);
+  };
+
+  const stopPreview = () => {
+    if (!canPreview) return;
+    setIsPreviewing(false);
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    if (previewRef.current) {
+      previewRef.current.pause();
+      previewRef.current.currentTime = 0;
+    }
+  };
+
+  const handlePlay = () => {
+    stopPreview();
+    onPlay(video);
+  };
 
   return (
     <article className='reel-card' onClick={handlePlay}>
-      <div className='reel-card__media'>
-        {poster ? (
+      <div
+        className='reel-card__media'
+        onMouseEnter={startPreview}
+        onMouseLeave={stopPreview}
+        onFocus={startPreview}
+        onBlur={stopPreview}
+      >
+        {isPreviewing && canPreview ? (
+          <video
+            ref={previewRef}
+            className='reel-card__preview'
+            src={previewSrc}
+            muted
+            loop
+            playsInline
+            preload='metadata'
+          />
+        ) : poster ? (
           <img src={poster} alt={title} loading='lazy' />
         ) : (
           <div className='reel-card__fallback'>No Poster</div>
