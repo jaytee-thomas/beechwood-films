@@ -54,8 +54,10 @@ app.use("/api/uploads", uploadsRouter);
 if (isProduction) {
   app.use(express.static(distDir));
 
-  app.get("*", (req, res, next) => {
+  app.use((req, res, next) => {
+    if (req.method !== "GET") return next();
     if (req.path.startsWith("/api/")) return next();
+    if (path.extname(req.path)) return next();
     res.sendFile(path.join(distDir, "index.html"), (err) => {
       if (err) next(err);
     });
