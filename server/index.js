@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import authRouter from "./routes/auth.js";
 import videosRouter from "./routes/videos.js";
 import favoritesRouter from "./routes/favorites.js";
@@ -16,6 +18,11 @@ const clientOrigins = (
 )
   .map((origin) => origin.trim())
   .filter(Boolean);
+const isProduction = process.env.NODE_ENV === "production";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distDir = path.resolve(__dirname, "../dist");
 
 if (!clientOrigins.length && process.env.NODE_ENV !== "production") {
   clientOrigins.push("http://localhost:5173");
@@ -43,6 +50,17 @@ app.use("/api/auth", authRouter);
 app.use("/api/videos", videosRouter);
 app.use("/api/favorites", favoritesRouter);
 app.use("/api/uploads", uploadsRouter);
+
+if (isProduction) {
+  app.use(express.static(distDir));
+
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/")) return next();
+    res.sendFile(path.join(distDir, "index.html"), (err) => {
+      if (err) next(err);
+    });
+  });
+}
 
 app.use((err, req, res, _next) => {
   console.error(err);
