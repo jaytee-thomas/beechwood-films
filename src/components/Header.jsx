@@ -99,11 +99,16 @@ export default function Header({ search, setSearch }) {
         {showSearch ? (
           <div className='bf-searchWrap'>
             <input
+              type='search'
               className='bf-search'
               placeholder='Search…'
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label='Search library'
+              inputMode='search'
+              enterKeyHint='search'
+              autoComplete='off'
+              spellCheck='false'
             />
             <span className='bf-searchIcon'>🔎</span>
           </div>
