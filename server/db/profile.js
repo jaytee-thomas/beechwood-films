@@ -3,24 +3,36 @@ import { createDefaultProfile, profileFields } from "../../shared/defaultProfile
 
 const PROFILE_ID = "default_profile";
 
-const selectProfile = db.prepare(
-  `SELECT ${profileFields.map((field) => `${field}`).join(", ")} FROM profile WHERE id = ?`
-);
+const statements = {
+  select: null,
+  selectFull: null,
+  upsert: null
+};
 
-const selectFullProfile = db.prepare(
-  `SELECT ${profileFields.map((field) => `${field}`).join(", ")}, updated_at FROM profile WHERE id = ?`
-);
+const quotedFields = profileFields.map((field) => `"${field}"`).join(", ");
+const valuePlaceholders = profileFields.map((field) => `@${field}`).join(", ");
+const updateAssignments = profileFields
+  .map((field) => `"${field}" = excluded."${field}"`)
+  .join(", ");
 
-const upsertProfile = db.prepare(
-  `INSERT INTO profile (id, ${profileFields.join(", ")}, updated_at)
-   VALUES (@id, ${profileFields.map((field) => `@${field}`).join(", ")}, @updated_at)
-   ON CONFLICT(id) DO UPDATE SET
-     ${profileFields.map((field) => `${field} = excluded.${field}`).join(", ")},
-     updated_at = excluded.updated_at`
-);
+const prepareStatements = () => {
+  if (statements.select) return;
+  statements.select = db.prepare(
+    `SELECT ${quotedFields} FROM profile WHERE id = ?`
+  );
+  statements.selectFull = db.prepare(
+    `SELECT ${quotedFields}, updated_at FROM profile WHERE id = ?`
+  );
+  statements.upsert = db.prepare(
+    `INSERT INTO profile (id, ${quotedFields}, updated_at)
+     VALUES (@id, ${valuePlaceholders}, @updated_at)
+     ON CONFLICT(id) DO UPDATE SET ${updateAssignments}, updated_at = excluded.updated_at`
+  );
+};
 
 export const getProfile = () => {
-  const row = selectProfile.get(PROFILE_ID);
+  prepareStatements();
+  const row = statements.select.get(PROFILE_ID);
   if (!row) {
     return createDefaultProfile();
   }
@@ -32,6 +44,7 @@ export const getProfile = () => {
 };
 
 export const saveProfile = (updates) => {
+  prepareStatements();
   const base = getProfile();
   const next = { ...base };
   for (const field of profileFields) {
@@ -39,7 +52,7 @@ export const saveProfile = (updates) => {
       next[field] = updates[field];
     }
   }
-  upsertProfile.run({
+  statements.upsert.run({
     id: PROFILE_ID,
     ...next,
     updated_at: Date.now()
@@ -48,7 +61,8 @@ export const saveProfile = (updates) => {
 };
 
 export const getProfileWithMeta = () => {
-  const row = selectFullProfile.get(PROFILE_ID);
+  prepareStatements();
+  const row = statements.selectFull.get(PROFILE_ID);
   if (!row) {
     return { ...createDefaultProfile(), updated_at: null };
   }
