@@ -754,6 +754,8 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
   const [tiktok, setTiktok] = useState(profile?.tiktok || "");
   const [instagram, setInstagram] = useState(profile?.instagram || "");
   const [facebook, setFacebook] = useState(profile?.facebook || "");
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -768,6 +770,8 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       setTiktok(profile?.tiktok || "");
       setInstagram(profile?.instagram || "");
       setFacebook(profile?.facebook || "");
+      setSaving(false);
+      setSubmitError("");
     }
   }, [open, profile]);
 
@@ -776,6 +780,11 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const MAX_BYTES = 3 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      window.alert("Please choose an image under 3 MB.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       setPhoto(reader.result?.toString() || "");
@@ -783,22 +792,30 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
     reader.readAsDataURL(file);
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    onSave({
-      name: name.trim(),
-      bio: bio.trim(),
-      hometown: hometown.trim(),
-      photo,
-      phone: phone.trim(),
-      email: email.trim(),
-      whatsapp: whatsapp.trim(),
-      youtube: youtube.trim(),
-      tiktok: tiktok.trim(),
-      instagram: instagram.trim(),
-      facebook: facebook.trim(),
-    });
-    onClose();
+    setSubmitError("");
+    setSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        bio: bio.trim(),
+        hometown: hometown.trim(),
+        photo,
+        phone: phone.trim(),
+        email: email.trim(),
+        whatsapp: whatsapp.trim(),
+        youtube: youtube.trim(),
+        tiktok: tiktok.trim(),
+        instagram: instagram.trim(),
+        facebook: facebook.trim(),
+      });
+      setSaving(false);
+      onClose();
+    } catch (error) {
+      setSubmitError(error.message || "Could not save profile.");
+      setSaving(false);
+    }
   };
 
   const S = {
@@ -862,13 +879,28 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       background: "#050505",
       alignSelf: "center",
     },
+    help: {
+      fontSize: "0.8rem",
+      color: "#9194a6",
+    },
+    error: {
+      color: "#ff8c8c",
+      fontSize: "0.85rem",
+      margin: 0,
+      alignSelf: "flex-start",
+    },
+    footer: {
+      marginTop: "auto",
+      paddingTop: 12,
+      borderTop: "1px solid rgba(47,50,64,0.6)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
     actions: {
       display: "flex",
       justifyContent: "flex-end",
       gap: 10,
-      marginTop: "auto",
-      paddingTop: 12,
-      borderTop: "1px solid rgba(47,50,64,0.6)",
     },
     btn: {
       padding: "8px 14px",
@@ -932,6 +964,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
               onChange={handleFile}
               style={{ ...S.input, padding: "10px" }}
             />
+            <span style={S.help}>Select a JPG or PNG under 3 MB.</span>
           </label>
 
           <label style={S.label}>
@@ -1035,13 +1068,20 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
           </label>
         </div>
 
-        <div style={S.actions}>
-          <button type='button' style={S.btn} onClick={onClose}>
-            Cancel
-          </button>
-          <button type='submit' style={{ ...S.btn, ...S.primary }}>
-            Save
-          </button>
+        <div style={S.footer}>
+          {submitError ? <p style={S.error}>{submitError}</p> : null}
+          <div style={S.actions}>
+            <button type='button' style={S.btn} onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button
+              type='submit'
+              style={{ ...S.btn, ...S.primary }}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
       </form>
     </>
@@ -1062,10 +1102,19 @@ export default function Library({
     toggleFavorite,
     removeVideo,
   } = useLibraryStore();
-  const { profile, updateProfile } = useProfileStore();
+  const profile = useProfileStore((state) => state.profile);
+  const loadProfile = useProfileStore((state) => state.loadProfile);
+  const saveProfile = useProfileStore((state) => state.saveProfile);
+  const profileReady = useProfileStore((state) => state.profileReady);
   const authUser = useAuth((state) => state.user);
   const isAdmin = authUser?.role === "admin";
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  useEffect(() => {
+    if (!profileReady) {
+      loadProfile().catch(() => {});
+    }
+  }, [profileReady, loadProfile]);
 
   const enrichReel = useCallback((video, index = 0) => {
     const poster = video.poster || video.thumbnail;
@@ -1713,7 +1762,7 @@ export default function Library({
         open={showProfileEdit}
         onClose={() => setShowProfileEdit(false)}
         profile={profile}
-        onSave={updateProfile}
+        onSave={saveProfile}
       />
 
       {deleteTarget && (

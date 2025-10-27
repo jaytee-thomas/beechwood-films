@@ -1,47 +1,99 @@
 import { create } from "zustand";
+import useAuth from "./useAuth.js";
+import useAdminPanel from "./useAdminPanel.js";
+import { createDefaultProfile } from "../../shared/defaultProfile.js";
 
-const KEY_PROFILE = "bf_profile_v1";
+const API_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+  (typeof process !== "undefined" && process.env?.VITE_API_URL) ||
+  "http://localhost:4000";
 
-const defaultProfile = {
-  name: "Jay In Nashville",
-  bio: "Filmmaker and storyteller capturing the rhythm of Nashville and beyond.",
-  hometown: "Nashville, TN",
-  photo:
-    "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=320&q=80",
-  phone: "(615) 555-0102",
-  email: "jay@beechwoodfilms.com",
-  whatsapp: "+1 615 555 0102",
-  youtube: "@Jay_In_Nashville",
-  tiktok: "@Jay_In_Nashville",
-  instagram: "@Jay_In_Nashville",
-  facebook: "JayInNashville",
+const parseError = async (response) => {
+  try {
+    const payload = await response.json();
+    return payload?.error || response.statusText || "Request failed";
+  } catch {
+    return response.statusText || "Request failed";
+  }
 };
 
-const readProfile = () => {
-  try {
-    const raw = localStorage.getItem(KEY_PROFILE);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return { ...defaultProfile, ...parsed };
+const authHeaders = () => {
+  const token = useAuth.getState().token;
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+};
+
+const initialState = {
+  profile: createDefaultProfile(),
+  profileReady: false,
+  loading: false,
+  saving: false,
+  error: null
+};
+
+const useProfileStore = create((set, get) => ({
+  ...initialState,
+
+  loadProfile: async (force = false) => {
+    if (get().loading) return get().profile;
+    if (get().profileReady && !force) return get().profile;
+
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(`${API_BASE}/api/profile`);
+      if (!response.ok) {
+        throw new Error(await parseError(response));
+      }
+      const data = await response.json();
+      const nextProfile = {
+        ...createDefaultProfile(),
+        ...(data?.profile || {})
+      };
+      set({ profile: nextProfile, profileReady: true, loading: false, error: null });
+      return nextProfile;
+    } catch (error) {
+      console.warn("Failed to load profile", error);
+      set({ loading: false, error: error.message, profileReady: true });
+      return get().profile;
     }
-  } catch {}
-  return defaultProfile;
-};
+  },
 
-const writeProfile = (profile) => {
-  try {
-    localStorage.setItem(KEY_PROFILE, JSON.stringify(profile));
-  } catch {}
-};
+  saveProfile: async (updates) => {
+    set({ saving: true, error: null });
+    try {
+      const response = await fetch(`${API_BASE}/api/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders()
+        },
+        body: JSON.stringify(updates)
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          useAuth.getState().clearSession();
+          const { openLogin } = useAdminPanel.getState();
+          if (typeof openLogin === "function") {
+            openLogin();
+          }
+        }
+        throw new Error(await parseError(response));
+      }
+      const data = await response.json();
+      const nextProfile = {
+        ...createDefaultProfile(),
+        ...(data?.profile || {})
+      };
+      set({ profile: nextProfile, profileReady: true, saving: false, error: null });
+      return nextProfile;
+    } catch (error) {
+      console.error("Failed to save profile", error);
+      set({ saving: false, error: error.message });
+      throw error;
+    }
+  },
 
-const useProfileStore = create((set) => ({
-  profile: readProfile(),
-  updateProfile: (updates) =>
-    set((state) => {
-      const profile = { ...state.profile, ...updates };
-      writeProfile(profile);
-      return { profile };
-    }),
+  resetProfileState: () => set({ ...initialState, profile: createDefaultProfile() })
 }));
 
 export default useProfileStore;

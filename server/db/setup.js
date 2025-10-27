@@ -1,4 +1,7 @@
 import db from "./client.js";
+import { createDefaultProfile, profileFields } from "../../shared/defaultProfile.js";
+
+const PROFILE_ID = "default_profile";
 
 const createTables = () => {
   db.exec(`
@@ -42,6 +45,22 @@ const createTables = () => {
       PRIMARY KEY (user_id, video_id),
       FOREIGN KEY(user_id) REFERENCES users(id),
       FOREIGN KEY(video_id) REFERENCES videos(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS profile (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      bio TEXT,
+      hometown TEXT,
+      photo TEXT,
+      phone TEXT,
+      email TEXT,
+      whatsapp TEXT,
+      youtube TEXT,
+      tiktok TEXT,
+      instagram TEXT,
+      facebook TEXT,
+      updated_at INTEGER NOT NULL
     );
   `);
 };
@@ -125,7 +144,29 @@ const seedVideosIfEmpty = () => {
   insertMany(fallbackVideos);
 };
 
+const seedProfileIfMissing = () => {
+  const row = db.prepare("SELECT COUNT(*) as count FROM profile WHERE id = ?").get(PROFILE_ID);
+  if (row.count > 0) return;
+
+  const defaults = createDefaultProfile();
+  const now = Date.now();
+  const columns = profileFields
+    .map((field) => `"${field}"`)
+    .join(", ");
+  const placeholders = profileFields.map((field) => `@${field}`).join(", ");
+
+  db.prepare(
+    `INSERT INTO profile (id, ${columns}, updated_at)
+     VALUES (@id, ${placeholders}, @updated_at)`
+  ).run({
+    id: PROFILE_ID,
+    updated_at: now,
+    ...defaults
+  });
+};
+
 export const initializeDatabase = () => {
   createTables();
   seedVideosIfEmpty();
+  seedProfileIfMissing();
 };
