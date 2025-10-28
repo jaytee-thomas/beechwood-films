@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
+import useSettingsStore from "../store/useSettingsStore";
 
 const FEATURED_SETS = [
   {
@@ -23,8 +24,26 @@ const FEATURED_SETS = [
 ];
 
 export default function Landing() {
+  const homeWallpaper = useSettingsStore((state) => state.settings.homeWallpaper || "");
+  const loadSettings = useSettingsStore((state) => state.loadSettings);
+
+  useEffect(() => {
+    loadSettings().catch(() => {});
+  }, [loadSettings]);
+
+  const landingStyle = homeWallpaper
+    ? {
+        backgroundImage: `linear-gradient(135deg, rgba(7, 8, 18, 0.72), rgba(7, 8, 18, 0.6)), url("${homeWallpaper}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat"
+      }
+    : {};
+
+  const showFallbackImage = !homeWallpaper;
+
   return (
-    <main className='landing'>
+    <main className={`landing${homeWallpaper ? " landing--hasWallpaper" : ""}`} style={landingStyle}>
       <section className='landing__hero'>
         <div className='landing__copy'>
           <span className='landing__eyebrow'>Beechwood Films</span>
@@ -36,9 +55,11 @@ export default function Landing() {
             <Link className='landing__btn landing__btn--primary' to='/library'>Explore Library</Link>
           </div>
         </div>
-        <div className='landing__imageFrame' aria-hidden='true'>
-          <img src='/lPic2.jpg' alt='' loading='lazy' />
-        </div>
+        {showFallbackImage ? (
+          <div className='landing__imageFrame' aria-hidden='true'>
+            <img src='/lPic2.jpg' alt='' loading='lazy' />
+          </div>
+        ) : null}
       </section>
 
       <section className='landing__sections' aria-label='Library Sections'>

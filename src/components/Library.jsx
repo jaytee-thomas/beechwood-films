@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Heart, X, Pencil } from "lucide-react";
 import useLibraryStore from "../store/useLibraryStore";
 import useProfileStore from "../store/useProfileStore";
+import useSettingsStore from "../store/useSettingsStore";
 import useAuth from "../store/useAuth";
 import MCard from "./MCard.jsx";
 import ReelsCard from "./ReelsCard.jsx";
@@ -760,11 +761,15 @@ function PlayerOverlay({ video, onClose }) {
    Edit Profile Modal
 ------------------------- */
 function EditProfileModal({ open, onClose, profile, onSave }) {
+  const settings = useSettingsStore((state) => state.settings);
+  const saveSettings = useSettingsStore((state) => state.saveSettings);
+  const loadSettings = useSettingsStore((state) => state.loadSettings);
   const [name, setName] = useState(profile?.name || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [hometown, setHometown] = useState(profile?.hometown || "");
   const [photo, setPhoto] = useState(profile?.photo || "");
   const [wallpaper, setWallpaper] = useState(profile?.wallpaper || "");
+  const [homeWallpaper, setHomeWallpaper] = useState(settings?.homeWallpaper || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [email, setEmail] = useState(profile?.email || "");
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || "");
@@ -777,11 +782,13 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
 
   useEffect(() => {
     if (open) {
+      loadSettings().catch(() => {});
       setName(profile?.name || "");
       setBio(profile?.bio || "");
       setHometown(profile?.hometown || "");
       setPhoto(profile?.photo || "");
       setWallpaper(profile?.wallpaper || "");
+      setHomeWallpaper(settings?.homeWallpaper || "");
       setPhone(profile?.phone || "");
       setEmail(profile?.email || "");
       setWhatsapp(profile?.whatsapp || "");
@@ -792,7 +799,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       setSaving(false);
       setSubmitError("");
     }
-  }, [open, profile]);
+  }, [open, profile, loadSettings, settings?.homeWallpaper]);
 
   if (!open) return null;
 
@@ -826,6 +833,21 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
     reader.readAsDataURL(file);
   };
 
+  const handleHomeWallpaperFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      window.alert("Please choose a home background under 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setHomeWallpaper(reader.result?.toString() || "");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSubmitError("");
@@ -845,6 +867,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
         facebook: facebook.trim(),
         wallpaper,
       });
+      await saveSettings({ homeWallpaper });
       setSaving(false);
       onClose();
     } catch (error) {
@@ -915,6 +938,18 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       alignSelf: "center",
     },
     wallpaperPreview: {
+      width: "100%",
+      aspectRatio: "16 / 9",
+      borderRadius: 12,
+      overflow: "hidden",
+      border: "1px solid #2f3240",
+      background: "#05060c",
+      display: "grid",
+      placeItems: "center",
+      color: "#666",
+      fontSize: "0.85rem",
+    },
+    homeWallpaperPreview: {
       width: "100%",
       aspectRatio: "16 / 9",
       borderRadius: 12,
@@ -1049,6 +1084,43 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
               </button>
             </div>
             <span style={S.help}>Use a wide image (16:9) for best results. Files up to 5 MB.</span>
+          </label>
+
+          <label style={S.label}>
+            <span>Home Page Wallpaper</span>
+            <div style={S.homeWallpaperPreview}>
+              {homeWallpaper ? (
+                <img
+                  src={homeWallpaper}
+                  alt='Home background preview'
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span>No home background set</span>
+              )}
+            </div>
+            <input
+              type='file'
+              accept='image/*'
+              onChange={handleHomeWallpaperFile}
+              style={{ ...S.input, padding: "10px" }}
+            />
+            <input
+              style={S.input}
+              value={homeWallpaper}
+              onChange={(e) => setHomeWallpaper(e.target.value)}
+              placeholder='Paste a home background image URL'
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type='button'
+                style={{ ...S.btn, padding: "6px 10px" }}
+                onClick={() => setHomeWallpaper("")}
+              >
+                Clear home background
+              </button>
+            </div>
+            <span style={S.help}>Shown on the landing page. Wide images (16:9) look best. Up to 5 MB.</span>
           </label>
 
           <label style={S.label}>
@@ -1190,15 +1262,19 @@ export default function Library({
   const loadProfile = useProfileStore((state) => state.loadProfile);
   const saveProfile = useProfileStore((state) => state.saveProfile);
   const profileReady = useProfileStore((state) => state.profileReady);
+  const loadSettings = useSettingsStore((state) => state.loadSettings);
+  const saveFallback = useLibraryStore((state) => state.saveFallback);
   const authUser = useAuth((state) => state.user);
   const isAdmin = authUser?.role === "admin";
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [fallbackPending, setFallbackPending] = useState(false);
 
   useEffect(() => {
     if (!profileReady) {
       loadProfile().catch(() => {});
     }
-  }, [profileReady, loadProfile]);
+    loadSettings().catch(() => {});
+  }, [profileReady, loadProfile, loadSettings]);
 
   const enrichReel = useCallback((video, index = 0) => {
     const poster = video.poster || video.thumbnail;
@@ -1408,6 +1484,24 @@ export default function Library({
     }
   }, []);
 
+  const handleSetFallback = useCallback(async () => {
+    if (!isAdmin) return;
+    if (!videos.length) {
+      window.alert("Upload a video first before saving it as fallback.");
+      return;
+    }
+    setFallbackPending(true);
+    try {
+      await saveFallback();
+      window.alert("Current library saved as fallback. It will preload on a fresh deploy.");
+    } catch (error) {
+      console.error("Failed to save fallback", error);
+      window.alert(error.message || "Could not save fallback. Please try again.");
+    } finally {
+      setFallbackPending(false);
+    }
+  }, [isAdmin, saveFallback, videos.length]);
+
   const filtered = useMemo(() => {
     let list = videos || [];
     if (activeSection === "vids")
@@ -1551,6 +1645,18 @@ export default function Library({
         className={`bf-libraryMain${activeSection === "about" ? " is-about" : ""}`}
         role='main'
       >
+          {isAdmin && (
+            <div className='bf-adminActionsRow'>
+              <button
+                type='button'
+                className='bf-navBtn'
+                onClick={handleSetFallback}
+                disabled={fallbackPending || videos.length === 0}
+              >
+                {fallbackPending ? "Saving fallback..." : "Set current uploads as fallback"}
+              </button>
+            </div>
+          )}
           {activeSection === "about" ? (
             <section
               className='bf-aboutWallpaperSection'

@@ -1,5 +1,6 @@
 import db from "./client.js";
 import { createDefaultProfile, profileFields } from "../../shared/defaultProfile.js";
+import { seedVideosFromFallback } from "./fallback.js";
 
 const PROFILE_ID = "default_profile";
 const shouldSeedSampleVideos = process.env.SEED_SAMPLE_VIDEOS === "true";
@@ -69,6 +70,27 @@ const createTables = () => {
       instagram TEXT,
       facebook TEXT,
       updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS fallback_videos (
+      title TEXT,
+      embed_url TEXT NOT NULL,
+      src TEXT,
+      provider TEXT,
+      provider_id TEXT,
+      thumbnail TEXT,
+      library TEXT,
+      source TEXT,
+      duration TEXT,
+      date TEXT,
+      description TEXT,
+      tags TEXT,
+      file_name TEXT
     );
   `);
 };
@@ -215,4 +237,5 @@ export const initializeDatabase = () => {
   if (!shouldSeedSampleVideos) {
     purgeSeedVideos();
   }
+  seedVideosFromFallback();
 };

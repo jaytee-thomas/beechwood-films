@@ -9,6 +9,7 @@ import {
   deleteVideo as deleteVideoRecord,
   getVideoById
 } from "../db/videos.js";
+import { saveFallbackVideos } from "../db/fallback.js";
 
 const router = Router();
 
@@ -114,6 +115,16 @@ router.post("/", requireAdmin, (req, res, next) => {
       console.error("notify failed", error)
     );
     res.status(201).json({ video: created });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/fallback", requireAdmin, (req, res, next) => {
+  try {
+    const videos = listVideos();
+    saveFallbackVideos(videos);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
