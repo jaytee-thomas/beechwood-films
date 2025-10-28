@@ -281,10 +281,7 @@ function PlayerOverlay({ video, onClose }) {
         if (url.startsWith("blob:") || url.startsWith("data:video")) return true;
         if (!/^https?:/i.test(url)) return false;
         if (isYouTube(url) || isVimeo(url)) return false;
-        if (source.type && source.type.startsWith("video/")) return true;
-        if (source.extension && inferMimeFromExtension(source.extension)) return true;
-        if (isHlsSource(source) || isDashSource(source)) return true;
-        return false;
+        return true;
       });
   }, [sources]);
 
