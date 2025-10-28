@@ -213,6 +213,17 @@ const useLibraryStore = create((set, get) => ({
     return true;
   },
 
+  saveFallback: async () => {
+    const headers = authHeaders();
+    if (!headers.Authorization) {
+      throw new Error("Admin access required");
+    }
+    await apiRequest("/api/videos/fallback", {
+      method: "POST",
+      headers
+    });
+  },
+
   /** Favorites */
   toggleFavorite: async (id) => {
     const key = Number(id);

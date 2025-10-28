@@ -8,6 +8,7 @@ import videosRouter from "./routes/videos.js";
 import favoritesRouter from "./routes/favorites.js";
 import uploadsRouter from "./routes/uploads.js";
 import profileRouter from "./routes/profile.js";
+import settingsRouter from "./routes/settings.js";
 import { initializeDatabase } from "./db/setup.js";
 
 dotenv.config();
@@ -52,6 +53,7 @@ app.use("/api/videos", videosRouter);
 app.use("/api/favorites", favoritesRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/profile", profileRouter);
+app.use("/api/settings", settingsRouter);
 
 if (isProduction) {
   app.use(express.static(distDir));

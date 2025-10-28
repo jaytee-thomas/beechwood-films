@@ -11,7 +11,7 @@ const parseTags = (value) => {
   }
 };
 
-const serializeTags = (value) => {
+export const serializeTags = (value) => {
   if (!value) return JSON.stringify([]);
   if (Array.isArray(value)) return JSON.stringify(value);
   if (typeof value === "string") {
@@ -135,4 +135,3 @@ export const deleteVideo = (id) => {
   }
   return info.changes > 0;
 };
-

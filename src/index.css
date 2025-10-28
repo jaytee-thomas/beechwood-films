@@ -30,6 +30,26 @@ body {
   display: flex;
   flex-direction: column;
   gap: 72px;
+  background-color: #06070f;
+}
+
+.landing.landing--hasWallpaper {
+  position: relative;
+  color: #f7f9ff;
+}
+
+.landing.landing--hasWallpaper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 7, 16, 0.78), rgba(6, 7, 16, 0.92));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing.landing--hasWallpaper > * {
+  position: relative;
+  z-index: 1;
 }
 
 .landing__hero {
@@ -2661,6 +2681,13 @@ body {
   gap: 22px;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   justify-items: stretch;
+}
+
+.bf-adminActionsRow {
+  margin: 0 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .bf-showcase__empty {
