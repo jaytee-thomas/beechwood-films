@@ -1344,6 +1344,8 @@ export default function Library({
     };
     push("youtube", "YouTube", profile?.youtube);
     push("tiktok", "TikTok", profile?.tiktok);
+    push("instagram", "Instagram", profile?.instagram);
+    push("facebook", "Facebook", profile?.facebook);
     return links;
   }, [profile]);
   const sanitizePhone = useCallback((value = "") => value.replace(/[^\d+]/g, ""), []);
