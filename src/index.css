@@ -42,7 +42,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6, 7, 16, 0.78), rgba(6, 7, 16, 0.92));
+  background: linear-gradient(180deg, rgba(6, 7, 16, 0.68), rgba(6, 7, 16, 0.88));
   pointer-events: none;
   z-index: 0;
 }
@@ -2688,6 +2688,60 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.bf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.92rem;
+  color: rgba(240, 244, 255, 0.88);
+}
+
+.bf-toggle.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.bf-toggle__input {
+  display: none;
+}
+
+.bf-toggle__track {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(80, 86, 120, 0.4);
+  border: 1px solid rgba(126, 140, 200, 0.35);
+  transition: background 0.25s ease;
+}
+
+.bf-toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f5f6ff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s ease;
+}
+
+.bf-toggle__label {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.bf-toggle__input:checked + .bf-toggle__track {
+  background: linear-gradient(135deg, #5263f2, #8f6cff);
+}
+
+.bf-toggle__input:checked + .bf-toggle__track .bf-toggle__thumb {
+  transform: translateX(24px);
 }
 
 .bf-showcase__empty {
