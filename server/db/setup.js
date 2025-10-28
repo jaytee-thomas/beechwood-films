@@ -2,6 +2,13 @@ import db from "./client.js";
 import { createDefaultProfile, profileFields } from "../../shared/defaultProfile.js";
 
 const PROFILE_ID = "default_profile";
+const shouldSeedSampleVideos = process.env.SEED_SAMPLE_VIDEOS === "true";
+const SAMPLE_PROFILE_PHOTOS = [
+  "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=320&q=80"
+];
+const SAMPLE_WALLPAPERS = [
+  "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1920&q=80"
+];
 
 const createTables = () => {
   db.exec(`
@@ -174,9 +181,38 @@ const ensureProfileColumns = () => {
   }
 };
 
+const purgeSampleProfileMedia = () => {
+  if (SAMPLE_PROFILE_PHOTOS.length) {
+    const placeholders = SAMPLE_PROFILE_PHOTOS.map(() => "?").join(", ");
+    db.prepare(
+      `UPDATE profile SET photo = '' WHERE id = ? AND photo IN (${placeholders})`
+    ).run(PROFILE_ID, ...SAMPLE_PROFILE_PHOTOS);
+  }
+
+  if (SAMPLE_WALLPAPERS.length) {
+    const placeholders = SAMPLE_WALLPAPERS.map(() => "?").join(", ");
+    db.prepare(
+      `UPDATE profile SET wallpaper = '' WHERE id = ? AND wallpaper IN (${placeholders})`
+    ).run(PROFILE_ID, ...SAMPLE_WALLPAPERS);
+  }
+};
+
+const purgeSeedVideos = () => {
+  db.prepare(
+    "DELETE FROM favorites WHERE video_id IN (SELECT id FROM videos WHERE source = 'seed')"
+  ).run();
+  db.prepare("DELETE FROM videos WHERE source = 'seed'").run();
+};
+
 export const initializeDatabase = () => {
   createTables();
   ensureProfileColumns();
-  seedVideosIfEmpty();
+  if (shouldSeedSampleVideos) {
+    seedVideosIfEmpty();
+  }
   seedProfileIfMissing();
+  purgeSampleProfileMedia();
+  if (!shouldSeedSampleVideos) {
+    purgeSeedVideos();
+  }
 };
