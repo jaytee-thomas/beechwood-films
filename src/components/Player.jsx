@@ -5,7 +5,7 @@ import useAuth from "../store/useAuth";
 import useAdminPanel from "../store/useAdminPanel";
 import Header from "./Header";
 import MCard from "./MCard.jsx";
-import { attachDashStream, attachHlsStream, isDashSource, isHlsSource } from "../utils/streaming.js";
+import { isDashSource, isHlsSource } from "../utils/streaming.js";
 
 const VIDEO_MIME_TYPES = {
   mp4: "video/mp4",
@@ -205,59 +205,12 @@ export default function Player() {
     return null;
   }, [normaliseCandidate, video]);
 
+  const streamSource = fileSource && (isHlsSource(fileSource) || isDashSource(fileSource)) ? fileSource : null;
+  const playableFileSource = streamSource ? null : fileSource;
+
   useEffect(() => {
     setFilePlaybackError(false);
-  }, [fileSource?.url]);
-
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!isFile || !el) return undefined;
-    const source = fileSource;
-    if (!source?.url) {
-      setFilePlaybackError(true);
-      return undefined;
-    }
-
-    let cancelled = false;
-    let teardown = () => {};
-
-    const setup = async () => {
-      try {
-        if (isHlsSource(source)) {
-          teardown = await attachHlsStream(el, source.url);
-        } else if (isDashSource(source)) {
-          teardown = await attachDashStream(el, source.url);
-        } else {
-          el.src = source.url;
-          el.load();
-          teardown = () => {
-            if (el.src === source.url) {
-              el.removeAttribute("src");
-              el.load();
-            }
-          };
-        }
-        setFilePlaybackError(false);
-        if (typeof el.play === "function") {
-          el.play().catch(() => {});
-        }
-      } catch (error) {
-        console.error("Failed to initialise primary player stream", error);
-        setFilePlaybackError(true);
-      } finally {
-        if (cancelled) {
-          teardown?.();
-        }
-      }
-    };
-
-    setup();
-
-    return () => {
-      cancelled = true;
-      teardown?.();
-    };
-  }, [isFile, fileSource, setFilePlaybackError]);
+  }, [playableFileSource?.url, streamSource?.url]);
 
   const onLoadedMeta = () => {
     if (!videoRef.current || !video) return;
@@ -482,24 +435,41 @@ export default function Player() {
                 </div>
 
                 <div className='bf-playerStage'>
-                  {isFile && fileSource?.url && !filePlaybackError && (
+                  {isFile && playableFileSource?.url && !filePlaybackError && (
                     <video
                       ref={videoRef}
                       className='bf-playerVideo'
                       autoPlay
                       controls
                       playsInline
+                      key={`${video.id}-${playableFileSource.url}`}
                       onLoadedMetadata={onLoadedMeta}
                       onTimeUpdate={onTimeUpdate}
                       onEnded={onEnded}
                       onError={() => setFilePlaybackError(true)}
-                    />
+                    >
+                      <source
+                        src={playableFileSource.url}
+                        type={playableFileSource.type || undefined}
+                      />
+                    </video>
                   )}
-                  {isFile && (!fileSource?.url || filePlaybackError) && (
+                  {isFile && (!playableFileSource?.url || filePlaybackError) && (
                     <div className='bf-playerNotFound'>
-                      <p>
-                        This video format isn’t supported by your browser. Try uploading an MP4/WebM version or provide an HLS (.m3u8) / DASH (.mpd) stream.
-                      </p>
+                      {streamSource ? (
+                        <p>
+                          This video uses a streaming format ({isHlsSource(streamSource) ? "HLS" : "MPEG-DASH"}). Open it in a compatible player or convert it to MP4/WebM:
+                          {" "}
+                          <a href={streamSource.url} target='_blank' rel='noreferrer noopener'>
+                            {streamSource.url}
+                          </a>
+                          .
+                        </p>
+                      ) : (
+                        <p>
+                          This video format isn’t supported by your browser. Try uploading an MP4/WebM version for widest compatibility.
+                        </p>
+                      )}
                     </div>
                   )}
                   {isYouTube && ytSrc && (
