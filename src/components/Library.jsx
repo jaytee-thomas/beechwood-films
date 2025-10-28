@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Heart, X, Pencil } from "lucide-react";
 import useLibraryStore from "../store/useLibraryStore";
 import useProfileStore from "../store/useProfileStore";
@@ -6,7 +6,7 @@ import useAuth from "../store/useAuth";
 import MCard from "./MCard.jsx";
 import ReelsCard from "./ReelsCard.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
-import { attachDashStream, attachHlsStream, isDashSource, isHlsSource } from "../utils/streaming.js";
+import { isDashSource, isHlsSource } from "../utils/streaming.js";
 
 const YOUTUBE_PATTERNS = [
   /youtu\.be\/([^?&/]+)/i,
@@ -261,7 +261,7 @@ function PlayerOverlay({ video, onClose }) {
     return Array.from(map.values());
   }, [video]);
 
-  const nativeSources = useMemo(() => {
+  const normalizedSources = useMemo(() => {
     return sources
       .map((source) => {
         const extension = source.extension || inferExtension(source.url);
@@ -282,23 +282,26 @@ function PlayerOverlay({ video, onClose }) {
         if (!/^https?:/i.test(url)) return false;
         if (isYouTube(url) || isVimeo(url)) return false;
         if (source.type && source.type.startsWith("video/")) return true;
-        if (
-          source.type === "application/x-mpegURL" ||
-          source.type === "application/vnd.apple.mpegurl" ||
-          source.type === "application/dash+xml"
-        ) {
-          return true;
-        }
         if (source.extension && inferMimeFromExtension(source.extension)) return true;
+        if (isHlsSource(source) || isDashSource(source)) return true;
         return false;
       });
   }, [sources]);
 
-  const nativeSourcesKey = useMemo(
-    () => nativeSources.map((item) => item.url).join("|"),
-    [nativeSources]
+  const streamingSources = useMemo(
+    () => normalizedSources.filter((src) => isHlsSource(src) || isDashSource(src)),
+    [normalizedSources]
   );
-  const stageVideoRef = useRef(null);
+
+  const fileSources = useMemo(
+    () => normalizedSources.filter((src) => !isHlsSource(src) && !isDashSource(src)),
+    [normalizedSources]
+  );
+
+  const fileSourcesKey = useMemo(
+    () => fileSources.map((item) => item.url).join("|"),
+    [fileSources]
+  );
 
   const youtubeId = useMemo(() => {
     if (
@@ -461,14 +464,14 @@ function PlayerOverlay({ video, onClose }) {
   const stageMaxWidthRule = isReel ? "min(420px, 92vw)" : "min(960px, 92vw)";
   const stageMaxHeightRule = isReel ? "min(92vh, 92dvh)" : "min(82vh, 82dvh)";
 
-  const hasNativeVideo = nativeSources.length > 0;
+  const hasNativeVideo = fileSources.length > 0;
   const [activeNativeIndex, setActiveNativeIndex] = useState(0);
   const [playbackError, setPlaybackError] = useState(false);
 
   useEffect(() => {
     setActiveNativeIndex(0);
     setPlaybackError(false);
-  }, [nativeSourcesKey, video?.id]);
+  }, [fileSourcesKey, video?.id]);
 
   const handleNativeError = useCallback(() => {
     if (!hasNativeVideo) {
@@ -477,22 +480,22 @@ function PlayerOverlay({ video, onClose }) {
     }
     setActiveNativeIndex((current) => {
       const next = current + 1;
-      if (next < nativeSources.length) {
+      if (next < fileSources.length) {
         setPlaybackError(false);
         return next;
       }
       setPlaybackError(true);
       return current;
     });
-  }, [hasNativeVideo, nativeSources.length]);
+  }, [hasNativeVideo, fileSources]);
 
   const handleNativeLoadedData = useCallback(() => {
     setPlaybackError(false);
   }, []);
 
   const currentNativeSource =
-    hasNativeVideo && nativeSources[activeNativeIndex]
-      ? nativeSources[Math.min(activeNativeIndex, nativeSources.length - 1)]
+    hasNativeVideo && fileSources[activeNativeIndex]
+      ? fileSources[Math.min(activeNativeIndex, fileSources.length - 1)]
       : null;
   const poster =
     videoData.poster ||
@@ -502,51 +505,7 @@ function PlayerOverlay({ video, onClose }) {
     videoData.previewImage ||
     "";
 
-  useEffect(() => {
-    if (!showNativePlayer) return undefined;
-    const videoEl = stageVideoRef.current;
-    const source = currentNativeSource;
-    if (!videoEl || !source) return undefined;
-
-    let cancelled = false;
-    let teardown = () => {};
-
-    const setup = async () => {
-      try {
-        if (isHlsSource(source)) {
-          teardown = await attachHlsStream(videoEl, source.url);
-        } else if (isDashSource(source)) {
-          teardown = await attachDashStream(videoEl, source.url);
-        } else if (source.url) {
-          videoEl.src = source.url;
-          videoEl.load();
-          teardown = () => {
-            if (videoEl.src === source.url) {
-              videoEl.removeAttribute("src");
-              videoEl.load();
-            }
-          };
-        }
-        if (videoEl && typeof videoEl.play === "function") {
-          videoEl.play().catch(() => {});
-        }
-      } catch (error) {
-        console.error("Failed to initialise stream", error);
-        setPlaybackError(true);
-      } finally {
-        if (cancelled) {
-          teardown?.();
-        }
-      }
-    };
-
-    setup();
-
-    return () => {
-      cancelled = true;
-      teardown?.();
-    };
-  }, [currentNativeSource, showNativePlayer, setPlaybackError]);
+  const streamFallback = streamingSources.length ? streamingSources[0] : null;
 
   if (!hasVideo) {
     return null;
@@ -734,7 +693,6 @@ function PlayerOverlay({ video, onClose }) {
         <div style={stageStyle}>
           {showNativePlayer ? (
             <video
-              ref={stageVideoRef}
               controls
               autoPlay
               playsInline
@@ -745,7 +703,12 @@ function PlayerOverlay({ video, onClose }) {
               style={videoStyle}
               key={`${currentNativeSource.url}-${activeNativeIndex}`}
               crossOrigin='anonymous'
-            />
+            >
+              <source
+                src={currentNativeSource?.url}
+                type={currentNativeSource?.type || undefined}
+              />
+            </video>
           ) : showYouTube ? (
             <iframe
               title={video.title}
@@ -766,11 +729,21 @@ function PlayerOverlay({ video, onClose }) {
             />
           ) : (
             <div style={fallbackStyle}>
-              <p>
-                {playbackError
-                  ? "We couldn’t play any of the uploaded formats in this browser. Try uploading an MP4/WebM version or provide a streamable link."
-                  : "Cannot play this URL. Use a direct video file or a YouTube/Vimeo link."}
-              </p>
+              {streamFallback ? (
+                <p>
+                  This video uses a streaming format ({isHlsSource(streamFallback) ? "HLS" : "MPEG-DASH"}). Open it in a compatible player: {" "}
+                  <a href={streamFallback.url} target='_blank' rel='noreferrer noopener'>
+                    {streamFallback.url}
+                  </a>{" "}
+                  or upload an MP4/WebM version for in-browser playback.
+                </p>
+              ) : (
+                <p>
+                  {playbackError
+                    ? "We couldn’t play any of the uploaded formats in this browser. Try uploading an MP4/WebM version or provide a streamable link."
+                    : "Cannot play this URL. Use a direct video file or a YouTube/Vimeo link."}
+                </p>
+              )}
             </div>
           )}
         </div>
