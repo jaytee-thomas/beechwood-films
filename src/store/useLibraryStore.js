@@ -41,51 +41,6 @@ const saveDurations = (value) => write(KEY_DURATIONS, value);
 const loadLast = () => read(KEY_LAST, {});
 const saveLast = (value) => write(KEY_LAST, value);
 
-const fallbackVideos = [
-  {
-    id: 1001,
-    title: "Roots of Beechwood — A Short Doc",
-    provider: "youtube",
-    providerId: "dQw4w9WgXcQ",
-    embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    src: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-    library: "Documentaries",
-    source: "seed"
-  },
-  {
-    id: 1002,
-    title: "The Grove (Short Film)",
-    provider: "vimeo",
-    providerId: "76979871",
-    embedUrl: "https://player.vimeo.com/video/76979871",
-    src: "https://player.vimeo.com/video/76979871",
-    thumbnail: "https://picsum.photos/seed/bf2/640/360",
-    library: "Shorts",
-    source: "seed"
-  },
-  {
-    id: 1003,
-    title: "Behind the Lens — Director’s Cut",
-    provider: "file",
-    embedUrl: "https://media.w3.org/2010/05/sintel/trailer.mp4",
-    src: "https://media.w3.org/2010/05/sintel/trailer.mp4",
-    thumbnail: "https://picsum.photos/seed/bf3/640/360",
-    library: "Documentaries",
-    source: "seed"
-  },
-  {
-    id: 1004,
-    title: "Hometown Stories",
-    provider: "file",
-    embedUrl: "https://media.w3.org/2010/05/video/big_buck_bunny.mp4",
-    src: "https://media.w3.org/2010/05/video/big_buck_bunny.mp4",
-    thumbnail: "https://picsum.photos/seed/bf4/640/360",
-    library: "Shorts",
-    source: "seed"
-  }
-];
-
 const parseError = async (response) => {
   try {
     const payload = await response.json();
@@ -162,16 +117,16 @@ const useLibraryStore = create((set, get) => ({
               ? video.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
               : []
           }))
-        : fallbackVideos;
+        : [];
       set({ videos, loadingVideos: false, videosReady: true });
       return videos;
     } catch (error) {
       console.warn("Failed to load videos", error);
       if (!get().videos.length) {
-        set({ videos: fallbackVideos });
+        set({ videos: [] });
       }
       set({ loadingVideos: false, videosError: error.message, videosReady: true });
-      return fallbackVideos;
+      return [];
     }
   },
 

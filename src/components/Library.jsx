@@ -1379,17 +1379,17 @@ export default function Library({
   const hometownDisplay = profile?.hometown
     ? profile.hometown
     : "Add your hometown";
-  const profilePhoto =
-    profile?.photo ||
-    "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=320&q=80";
-  const profileWallpaper =
-    profile?.wallpaper ||
-    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1920&q=80";
+  const profilePhoto = profile?.photo?.trim() || "";
+  const profileWallpaper = profile?.wallpaper?.trim() || "";
   const profileBio = profile?.bio?.trim() || "";
   const aboutWallpaperStyle = useMemo(
-    () => ({
-      "--about-wallpaper": `url("${profileWallpaper}")`,
-    }),
+    () =>
+      profileWallpaper
+        ? { "--about-wallpaper": `url("${profileWallpaper}")` }
+        : {
+            "--about-wallpaper":
+              "linear-gradient(135deg, rgba(23, 25, 42, 0.92), rgba(10, 11, 20, 0.94))"
+          },
     [profileWallpaper]
   );
 
@@ -1569,10 +1569,14 @@ export default function Library({
                 <section className='bf-aboutSection is-full' aria-label='About profile'>
                   <div className='bf-aboutProfileCard'>
                     <div className='bf-aboutAvatarFlow'>
-                      <img
-                        src={profilePhoto}
-                        alt={`${profile?.name || "Profile"} portrait`}
-                      />
+                      {profilePhoto ? (
+                        <img
+                          src={profilePhoto}
+                          alt={`${profile?.name || "Profile"} portrait`}
+                        />
+                      ) : (
+                        <div className='bf-aboutAvatarPlaceholder'>Add photo</div>
+                      )}
                     </div>
                     <div className='bf-aboutProfileStack'>
                       <span className='bf-aboutPrimaryHandle'>{aboutHandle}</span>
