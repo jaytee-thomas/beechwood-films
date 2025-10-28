@@ -53,6 +53,7 @@ const createTables = () => {
       bio TEXT,
       hometown TEXT,
       photo TEXT,
+      wallpaper TEXT,
       phone TEXT,
       email TEXT,
       whatsapp TEXT,
@@ -165,8 +166,17 @@ const seedProfileIfMissing = () => {
   });
 };
 
+const ensureProfileColumns = () => {
+  const columns = db.prepare("PRAGMA table_info(profile)").all();
+  const columnNames = columns.map((column) => column.name);
+  if (!columnNames.includes("wallpaper")) {
+    db.prepare("ALTER TABLE profile ADD COLUMN wallpaper TEXT").run();
+  }
+};
+
 export const initializeDatabase = () => {
   createTables();
+  ensureProfileColumns();
   seedVideosIfEmpty();
   seedProfileIfMissing();
 };

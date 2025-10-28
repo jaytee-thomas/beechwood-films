@@ -764,6 +764,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
   const [bio, setBio] = useState(profile?.bio || "");
   const [hometown, setHometown] = useState(profile?.hometown || "");
   const [photo, setPhoto] = useState(profile?.photo || "");
+  const [wallpaper, setWallpaper] = useState(profile?.wallpaper || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [email, setEmail] = useState(profile?.email || "");
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || "");
@@ -780,6 +781,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       setBio(profile?.bio || "");
       setHometown(profile?.hometown || "");
       setPhoto(profile?.photo || "");
+      setWallpaper(profile?.wallpaper || "");
       setPhone(profile?.phone || "");
       setEmail(profile?.email || "");
       setWhatsapp(profile?.whatsapp || "");
@@ -809,6 +811,21 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
     reader.readAsDataURL(file);
   };
 
+  const handleWallpaperFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      window.alert("Please choose a background image under 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setWallpaper(reader.result?.toString() || "");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSubmitError("");
@@ -826,6 +843,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
         tiktok: tiktok.trim(),
         instagram: instagram.trim(),
         facebook: facebook.trim(),
+        wallpaper,
       });
       setSaving(false);
       onClose();
@@ -895,6 +913,18 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       border: "2px solid #2f3240",
       background: "#050505",
       alignSelf: "center",
+    },
+    wallpaperPreview: {
+      width: "100%",
+      aspectRatio: "16 / 9",
+      borderRadius: 12,
+      overflow: "hidden",
+      border: "1px solid #2f3240",
+      background: "#05060c",
+      display: "grid",
+      placeItems: "center",
+      color: "#666",
+      fontSize: "0.85rem",
     },
     help: {
       fontSize: "0.8rem",
@@ -982,6 +1012,43 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
               style={{ ...S.input, padding: "10px" }}
             />
             <span style={S.help}>Select a JPG or PNG under 3 MB.</span>
+          </label>
+
+          <label style={S.label}>
+            <span>Background Image</span>
+            <div style={S.wallpaperPreview}>
+              {wallpaper ? (
+                <img
+                  src={wallpaper}
+                  alt='Background preview'
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span>No background selected</span>
+              )}
+            </div>
+            <input
+              type='file'
+              accept='image/*'
+              onChange={handleWallpaperFile}
+              style={{ ...S.input, padding: "10px" }}
+            />
+            <input
+              style={S.input}
+              value={wallpaper}
+              onChange={(e) => setWallpaper(e.target.value)}
+              placeholder='Paste an image URL'
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type='button'
+                style={{ ...S.btn, padding: "6px 10px" }}
+                onClick={() => setWallpaper("")}
+              >
+                Clear background
+              </button>
+            </div>
+            <span style={S.help}>Use a wide image (16:9) for best results. Files up to 5 MB.</span>
           </label>
 
           <label style={S.label}>
@@ -1315,12 +1382,15 @@ export default function Library({
   const profilePhoto =
     profile?.photo ||
     "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=320&q=80";
+  const profileWallpaper =
+    profile?.wallpaper ||
+    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1920&q=80";
   const profileBio = profile?.bio?.trim() || "";
   const aboutWallpaperStyle = useMemo(
     () => ({
-      "--about-wallpaper": `url("${profilePhoto}")`,
+      "--about-wallpaper": `url("${profileWallpaper}")`,
     }),
-    [profilePhoto]
+    [profileWallpaper]
   );
 
   const shareVideo = useCallback((video) => {
