@@ -42,7 +42,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6, 7, 16, 0.68), rgba(6, 7, 16, 0.88));
+  background: linear-gradient(180deg, rgba(6, 7, 16, 0.42), rgba(6, 7, 16, 0.75));
   pointer-events: none;
   z-index: 0;
 }

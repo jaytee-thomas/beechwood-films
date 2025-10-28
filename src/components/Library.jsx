@@ -3,7 +3,6 @@ import { Heart, X, Pencil } from "lucide-react";
 import useLibraryStore from "../store/useLibraryStore";
 import useProfileStore from "../store/useProfileStore";
 import useSettingsStore from "../store/useSettingsStore";
-import useContentStore from "../store/useContentStore";
 import useAuth from "../store/useAuth";
 import MCard from "./MCard.jsx";
 import ReelsCard from "./ReelsCard.jsx";
@@ -761,7 +760,7 @@ function PlayerOverlay({ video, onClose }) {
 /* -------------------------
    Edit Profile Modal
 ------------------------- */
-function EditProfileModal({ open, onClose, profile, onSave, content, onSaveContent }) {
+function EditProfileModal({ open, onClose, profile, onSave }) {
   const settings = useSettingsStore((state) => state.settings);
   const saveSettings = useSettingsStore((state) => state.saveSettings);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
@@ -771,17 +770,6 @@ function EditProfileModal({ open, onClose, profile, onSave, content, onSaveConte
   const [photo, setPhoto] = useState(profile?.photo || "");
   const [wallpaper, setWallpaper] = useState(profile?.wallpaper || "");
   const [homeWallpaper, setHomeWallpaper] = useState(settings?.homeWallpaper || "");
-  const [homeEyebrow, setHomeEyebrow] = useState(content?.homeEyebrow || "");
-  const [homeTitle, setHomeTitle] = useState(content?.homeTitle || "");
-  const [homeLead, setHomeLead] = useState(content?.homeLead || "");
-  const [homeCtaLabel, setHomeCtaLabel] = useState(content?.homeCtaLabel || "");
-  const [homeCtaLink, setHomeCtaLink] = useState(content?.homeCtaLink || "");
-  const [homeQuickLinkOneLabel, setHomeQuickLinkOneLabel] = useState(content?.homeQuickLinkOneLabel || "");
-  const [homeQuickLinkOneHref, setHomeQuickLinkOneHref] = useState(content?.homeQuickLinkOneHref || "");
-  const [homeQuickLinkTwoLabel, setHomeQuickLinkTwoLabel] = useState(content?.homeQuickLinkTwoLabel || "");
-  const [homeQuickLinkTwoHref, setHomeQuickLinkTwoHref] = useState(content?.homeQuickLinkTwoHref || "");
-  const [homeQuickLinkThreeLabel, setHomeQuickLinkThreeLabel] = useState(content?.homeQuickLinkThreeLabel || "");
-  const [homeQuickLinkThreeHref, setHomeQuickLinkThreeHref] = useState(content?.homeQuickLinkThreeHref || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [email, setEmail] = useState(profile?.email || "");
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || "");
@@ -801,17 +789,6 @@ function EditProfileModal({ open, onClose, profile, onSave, content, onSaveConte
       setPhoto(profile?.photo || "");
       setWallpaper(profile?.wallpaper || "");
       setHomeWallpaper(settings?.homeWallpaper || "");
-      setHomeEyebrow(content?.homeEyebrow || "");
-      setHomeTitle(content?.homeTitle || "");
-      setHomeLead(content?.homeLead || "");
-      setHomeCtaLabel(content?.homeCtaLabel || "");
-      setHomeCtaLink(content?.homeCtaLink || "");
-      setHomeQuickLinkOneLabel(content?.homeQuickLinkOneLabel || "");
-      setHomeQuickLinkOneHref(content?.homeQuickLinkOneHref || "");
-      setHomeQuickLinkTwoLabel(content?.homeQuickLinkTwoLabel || "");
-      setHomeQuickLinkTwoHref(content?.homeQuickLinkTwoHref || "");
-      setHomeQuickLinkThreeLabel(content?.homeQuickLinkThreeLabel || "");
-      setHomeQuickLinkThreeHref(content?.homeQuickLinkThreeHref || "");
       setPhone(profile?.phone || "");
       setEmail(profile?.email || "");
       setWhatsapp(profile?.whatsapp || "");
@@ -822,7 +799,7 @@ function EditProfileModal({ open, onClose, profile, onSave, content, onSaveConte
       setSaving(false);
       setSubmitError("");
     }
-  }, [open, profile, loadSettings, settings?.homeWallpaper, content]);
+  }, [open, profile, loadSettings, settings?.homeWallpaper]);
 
   if (!open) return null;
 
@@ -891,19 +868,6 @@ function EditProfileModal({ open, onClose, profile, onSave, content, onSaveConte
         wallpaper,
       });
       await saveSettings({ homeWallpaper });
-      await onSaveContent({
-        homeEyebrow,
-        homeTitle,
-        homeLead,
-        homeCtaLabel,
-        homeCtaLink,
-        homeQuickLinkOneLabel,
-        homeQuickLinkOneHref,
-        homeQuickLinkTwoLabel,
-        homeQuickLinkTwoHref,
-        homeQuickLinkThreeLabel,
-        homeQuickLinkThreeHref
-      });
       setSaving(false);
       onClose();
     } catch (error) {
@@ -1084,106 +1048,6 @@ function EditProfileModal({ open, onClose, profile, onSave, content, onSaveConte
             />
             <span style={S.help}>Select a JPG or PNG under 3 MB.</span>
           </label>
-
-          <fieldset style={{ display: "grid", gap: 12, border: "1px solid #2f3240", borderRadius: 12, padding: 16 }}>
-            <legend style={{ fontSize: "0.9rem", padding: "0 8px" }}>Home Page Text</legend>
-            <label style={S.label}>
-              <span>Eyebrow</span>
-              <input
-                style={S.input}
-                value={homeEyebrow}
-                onChange={(e) => setHomeEyebrow(e.target.value)}
-                placeholder='Small label above the headline'
-              />
-            </label>
-            <label style={S.label}>
-              <span>Headline</span>
-              <input
-                style={S.input}
-                value={homeTitle}
-                onChange={(e) => setHomeTitle(e.target.value)}
-                placeholder='Main heading on the home page'
-              />
-            </label>
-            <label style={S.label}>
-              <span>Lead Paragraph</span>
-              <textarea
-                style={{ ...S.input, ...S.textarea }}
-                value={homeLead}
-                onChange={(e) => setHomeLead(e.target.value)}
-                placeholder='Short paragraph under the headline'
-              />
-            </label>
-            <label style={S.label}>
-              <span>CTA Label</span>
-              <input
-                style={S.input}
-                value={homeCtaLabel}
-                onChange={(e) => setHomeCtaLabel(e.target.value)}
-                placeholder='Explore Library'
-              />
-            </label>
-            <label style={S.label}>
-              <span>CTA Link</span>
-              <input
-                style={S.input}
-                value={homeCtaLink}
-                onChange={(e) => setHomeCtaLink(e.target.value)}
-                placeholder='/library'
-              />
-            </label>
-            <label style={S.label}>
-              <span>Quick Link #1</span>
-              <div style={{ display: "grid", gap: 8 }}>
-                <input
-                  style={S.input}
-                  value={homeQuickLinkOneLabel}
-                  onChange={(e) => setHomeQuickLinkOneLabel(e.target.value)}
-                  placeholder='Label (leave blank to hide)'
-                />
-                <input
-                  style={S.input}
-                  value={homeQuickLinkOneHref}
-                  onChange={(e) => setHomeQuickLinkOneHref(e.target.value)}
-                  placeholder='/vids'
-                />
-              </div>
-            </label>
-            <label style={S.label}>
-              <span>Quick Link #2</span>
-              <div style={{ display: "grid", gap: 8 }}>
-                <input
-                  style={S.input}
-                  value={homeQuickLinkTwoLabel}
-                  onChange={(e) => setHomeQuickLinkTwoLabel(e.target.value)}
-                  placeholder='Label (leave blank to hide)'
-                />
-                <input
-                  style={S.input}
-                  value={homeQuickLinkTwoHref}
-                  onChange={(e) => setHomeQuickLinkTwoHref(e.target.value)}
-                  placeholder='/reels'
-                />
-              </div>
-            </label>
-            <label style={S.label}>
-              <span>Quick Link #3</span>
-              <div style={{ display: "grid", gap: 8 }}>
-                <input
-                  style={S.input}
-                  value={homeQuickLinkThreeLabel}
-                  onChange={(e) => setHomeQuickLinkThreeLabel(e.target.value)}
-                  placeholder='Label (leave blank to hide)'
-                />
-                <input
-                  style={S.input}
-                  value={homeQuickLinkThreeHref}
-                  onChange={(e) => setHomeQuickLinkThreeHref(e.target.value)}
-                  placeholder='/about'
-                />
-              </div>
-            </label>
-          </fieldset>
 
           <label style={S.label}>
             <span>Background Image</span>
@@ -1400,21 +1264,18 @@ export default function Library({
   const profileReady = useProfileStore((state) => state.profileReady);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const saveFallback = useLibraryStore((state) => state.saveFallback);
-  const content = useContentStore((state) => state.content);
-  const loadContent = useContentStore((state) => state.loadContent);
-  const saveContent = useContentStore((state) => state.saveContent);
   const authUser = useAuth((state) => state.user);
   const isAdmin = authUser?.role === "admin";
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [fallbackPending, setFallbackPending] = useState(false);
+  const [fallbackSaved, setFallbackSaved] = useState(false);
 
   useEffect(() => {
     if (!profileReady) {
       loadProfile().catch(() => {});
     }
     loadSettings().catch(() => {});
-    loadContent().catch(() => {});
-  }, [profileReady, loadProfile, loadSettings, loadContent]);
+  }, [profileReady, loadProfile, loadSettings]);
 
   const enrichReel = useCallback((video, index = 0) => {
     const poster = video.poster || video.thumbnail;
@@ -1624,11 +1485,8 @@ export default function Library({
     }
   }, []);
 
-  const handleSetFallback = useCallback(async (event) => {
+  const handleSetFallback = useCallback(async () => {
     if (!isAdmin) return;
-    if (event?.target) {
-      event.target.checked = false;
-    }
     if (!videos.length) {
       window.alert("Upload a video first before saving it as fallback.");
       return;
@@ -1637,13 +1495,19 @@ export default function Library({
     try {
       await saveFallback();
       window.alert("Current library saved as fallback. It will preload on a fresh deploy.");
+      setFallbackSaved(true);
     } catch (error) {
       console.error("Failed to save fallback", error);
       window.alert(error.message || "Could not save fallback. Please try again.");
+      setFallbackSaved(false);
     } finally {
       setFallbackPending(false);
     }
   }, [isAdmin, saveFallback, videos.length]);
+
+  useEffect(() => {
+    setFallbackSaved(false);
+  }, [videos]);
 
   const filtered = useMemo(() => {
     let list = videos || [];
@@ -1795,13 +1659,18 @@ export default function Library({
                   type='checkbox'
                   className='bf-toggle__input'
                   onChange={handleSetFallback}
+                  checked={fallbackSaved}
                   disabled={fallbackPending || videos.length === 0}
                 />
                 <span className='bf-toggle__track'>
                   <span className='bf-toggle__thumb' />
                 </span>
                 <span className='bf-toggle__label'>
-                  {fallbackPending ? "Saving fallback…" : "Snapshot current uploads as fallback"}
+                  {fallbackPending
+                    ? "Saving fallback…"
+                    : fallbackSaved
+                    ? "Fallback saved"
+                    : "Snapshot current uploads as fallback"}
                 </span>
               </label>
             </div>
@@ -2111,8 +1980,6 @@ export default function Library({
         onClose={() => setShowProfileEdit(false)}
         profile={profile}
         onSave={saveProfile}
-        content={content}
-        onSaveContent={saveContent}
       />
 
       {deleteTarget && (
