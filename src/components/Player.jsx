@@ -1,10 +1,67 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import useLibraryStore from "../store/useLibraryStore";
 import useAuth from "../store/useAuth";
 import useAdminPanel from "../store/useAdminPanel";
 import Header from "./Header";
 import MCard from "./MCard.jsx";
+import { attachDashStream, attachHlsStream, isDashSource, isHlsSource } from "../utils/streaming.js";
+
+const VIDEO_MIME_TYPES = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  ogv: "video/ogg",
+  ogg: "video/ogg",
+  mkv: "video/x-matroska",
+  avi: "video/x-msvideo",
+  wmv: "video/x-ms-wmv",
+  flv: "video/x-flv",
+  f4v: "video/x-f4v",
+  mpg: "video/mpeg",
+  mpeg: "video/mpeg",
+  mp2: "video/mpeg",
+  ts: "video/mp2t",
+  m2ts: "video/mp2t",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  m3u8: "application/x-mpegURL",
+  mpd: "application/dash+xml"
+};
+
+const inferExtension = (url = "") => {
+  if (!url) return "";
+  const clean = url.split("?")[0].split("#")[0];
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  return match ? match[1].toLowerCase() : "";
+};
+
+const inferMimeFromExtension = (ext = "") => {
+  if (!ext) return undefined;
+  return VIDEO_MIME_TYPES[ext];
+};
+
+const inferMimeFromQuery = (url = "") => {
+  try {
+    const base =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "http://localhost";
+    const parsed = new URL(url, base);
+    const param =
+      parsed.searchParams.get("contentType") ||
+      parsed.searchParams.get("ContentType") ||
+      parsed.searchParams.get("mime") ||
+      parsed.searchParams.get("MimeType");
+    if (param && param.toLowerCase().startsWith("video/")) {
+      return param;
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+  return undefined;
+};
 
 export default function Player() {
   const { id } = useParams();
@@ -39,9 +96,10 @@ export default function Player() {
     [videos, id]
   );
 
-  const isFile = video?.provider === "file";
-  const isYouTube = video?.provider === "youtube";
-  const isVimeo = video?.provider === "vimeo";
+  const provider = (video?.provider || "").toLowerCase();
+  const isYouTube = provider === "youtube";
+  const isVimeo = provider === "vimeo";
+  const isFile = provider === "file" || (!provider && video);
 
   const ytSrc =
     isYouTube && video?.embedUrl
@@ -59,6 +117,147 @@ export default function Player() {
   // --- Save progress for file videos ---
   const videoRef = useRef(null);
   const lastSentRef = useRef(0);
+  const [filePlaybackError, setFilePlaybackError] = useState(false);
+
+  const normaliseCandidate = useCallback((value, typeHint) => {
+    if (!value) return null;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed || trimmed === "about:blank") return null;
+      const extension = inferExtension(trimmed);
+      const type =
+        typeHint ||
+        inferMimeFromExtension(extension) ||
+        inferMimeFromQuery(trimmed);
+      return { url: trimmed, type, extension };
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const normalised = normaliseCandidate(item, typeHint);
+        if (normalised) return normalised;
+      }
+      return null;
+    }
+    if (typeof value === "object") {
+      const objectType =
+        value.type ||
+        value.mimeType ||
+        value.mimetype ||
+        value.contentType ||
+        typeHint;
+      const direct =
+        normaliseCandidate(value.url, objectType) ||
+        normaliseCandidate(value.src, objectType) ||
+        normaliseCandidate(value.href, objectType);
+      if (direct) return direct;
+      if (Array.isArray(value.sources)) {
+        const nested = normaliseCandidate(value.sources, objectType);
+        if (nested) return nested;
+      }
+      if (Array.isArray(value.files)) {
+        const nested = normaliseCandidate(value.files, objectType);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  }, []);
+
+  const fileSource = useMemo(() => {
+    if (!video) return null;
+    const candidates = [
+      [video.hlsUrl, "application/x-mpegURL"],
+      [video.dashUrl, "application/dash+xml"],
+      [video.streamUrl, video.streamType],
+      [video.embedUrl, video.mimeType || video.mimetype],
+      [video.src, video.mimeType || video.mimetype],
+      [video.downloadUrl, video.downloadType],
+      [video.fileUrl],
+      [video.fallbackSrc],
+      [video.previewSrc],
+    ];
+
+    for (const [value, hint] of candidates) {
+      const normalised = normaliseCandidate(value, hint);
+      if (normalised) return normalised;
+    }
+
+    if (Array.isArray(video?.sources)) {
+      const normalised = normaliseCandidate(video.sources);
+      if (normalised) return normalised;
+    }
+    if (Array.isArray(video?.formats)) {
+      const normalised = normaliseCandidate(video.formats);
+      if (normalised) return normalised;
+    }
+    if (Array.isArray(video?.files)) {
+      const normalised = normaliseCandidate(video.files);
+      if (normalised) return normalised;
+    }
+
+    for (const [key, value] of Object.entries(video || {})) {
+      if (!value) continue;
+      if (/(src|url)$/i.test(key) || /^(src|url)/i.test(key)) {
+        const normalised = normaliseCandidate(value);
+        if (normalised) return normalised;
+      }
+    }
+
+    return null;
+  }, [normaliseCandidate, video]);
+
+  useEffect(() => {
+    setFilePlaybackError(false);
+  }, [fileSource?.url]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!isFile || !el) return undefined;
+    const source = fileSource;
+    if (!source?.url) {
+      setFilePlaybackError(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    let teardown = () => {};
+
+    const setup = async () => {
+      try {
+        if (isHlsSource(source)) {
+          teardown = await attachHlsStream(el, source.url);
+        } else if (isDashSource(source)) {
+          teardown = await attachDashStream(el, source.url);
+        } else {
+          el.src = source.url;
+          el.load();
+          teardown = () => {
+            if (el.src === source.url) {
+              el.removeAttribute("src");
+              el.load();
+            }
+          };
+        }
+        setFilePlaybackError(false);
+        if (typeof el.play === "function") {
+          el.play().catch(() => {});
+        }
+      } catch (error) {
+        console.error("Failed to initialise primary player stream", error);
+        setFilePlaybackError(true);
+      } finally {
+        if (cancelled) {
+          teardown?.();
+        }
+      }
+    };
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      teardown?.();
+    };
+  }, [isFile, fileSource, setFilePlaybackError]);
 
   const onLoadedMeta = () => {
     if (!videoRef.current || !video) return;
@@ -283,18 +482,25 @@ export default function Player() {
                 </div>
 
                 <div className='bf-playerStage'>
-                  {isFile && video.embedUrl && (
+                  {isFile && fileSource?.url && !filePlaybackError && (
                     <video
                       ref={videoRef}
                       className='bf-playerVideo'
-                      src={video.embedUrl}
                       autoPlay
                       controls
                       playsInline
                       onLoadedMetadata={onLoadedMeta}
                       onTimeUpdate={onTimeUpdate}
                       onEnded={onEnded}
+                      onError={() => setFilePlaybackError(true)}
                     />
+                  )}
+                  {isFile && (!fileSource?.url || filePlaybackError) && (
+                    <div className='bf-playerNotFound'>
+                      <p>
+                        This video format isn’t supported by your browser. Try uploading an MP4/WebM version or provide an HLS (.m3u8) / DASH (.mpd) stream.
+                      </p>
+                    </div>
                   )}
                   {isYouTube && ytSrc && (
                     <iframe
