@@ -25,7 +25,7 @@ const FEATURED_SETS = [
 ];
 
 export default function Landing() {
-  const homeWallpaper = useSettingsStore((state) => state.settings.homeWallpaper || "");
+  const homeWallpaper = useSettingsStore((state) => state.settings.homeWallpaper || "/WP1.jpg");
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const content = useContentStore((state) => state.content);
   const loadContent = useContentStore((state) => state.loadContent);
@@ -52,7 +52,7 @@ export default function Landing() {
       }
     : {};
 
-  const showFallbackImage = !homeWallpaper;
+  const showFallbackImage = false;
   const quickLinks = [
     {
       id: "quick-1",
@@ -84,11 +84,7 @@ export default function Landing() {
             </Link>
           </div>
         </div>
-        {showFallbackImage ? (
-          <div className='landing__imageFrame' aria-hidden='true'>
-            <img src='/lPic2.jpg' alt='' loading='lazy' />
-          </div>
-        ) : null}
+        {showFallbackImage ? null : null}
       </section>
 
       {quickLinks.length > 0 ? (
