@@ -22,6 +22,12 @@ const FEATURED_SETS = [
     blurb: "Meet the team behind Beechwood Films.",
     to: "/about",
   },
+  {
+    id: "set-nsfw",
+    label: "NSFW",
+    blurb: "Explicit or adults-only content (login required).",
+    to: "/nsfw",
+  },
 ];
 
 export default function Landing() {

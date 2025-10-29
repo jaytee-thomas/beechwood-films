@@ -1385,6 +1385,8 @@ export default function Library({
       ? "reels"
       : mode === "favorites"
       ? "favorites"
+      : mode === "nsfw"
+      ? "nsfw"
       : mode === "about"
       ? "about"
       : "home";
@@ -1605,6 +1607,8 @@ export default function Library({
       list = list.filter((v) => (v.library || "").toLowerCase() === "reels");
     else if (activeSection === "favorites")
       list = list.filter((v) => favorites.includes(v.id));
+    else if (activeSection === "nsfw")
+      list = list.filter((v) => (v.library || "").toLowerCase() === "nsfw");
     else if (activeSection === "home")
       list = list.filter((v) => {
         const tag = (v.library || "").toLowerCase();
@@ -1670,6 +1674,11 @@ export default function Library({
       };
     });
   }, [filtered, enrichReel, enrichVideo]);
+
+  const nsfwPageCards = useMemo(() => {
+    if (activeSection !== "nsfw") return [];
+    return filtered.map((video) => enrichVideo(video));
+  }, [activeSection, filtered, enrichVideo]);
 
   const isLibraryVideo = useCallback(
     (video) =>
@@ -2058,6 +2067,36 @@ export default function Library({
               <div className='bf-showcase__empty'>
                 You haven’t favorited any videos yet.
               </div>
+            )}
+          </section>
+        ) : activeSection === "nsfw" ? (
+          <section className='bf-showcase bf-showcase--nsfw' aria-label='NSFW library'>
+            <div className='bf-showcase__head'>
+              <h2 className='bf-showcase__title'>NSFW Library</h2>
+              <p className='bf-showcase__subtitle'>Content flagged as explicit or adults-only.</p>
+            </div>
+            {nsfwPageCards.length > 0 ? (
+              <div className='bf-showcase__row'>
+                {nsfwPageCards.map((video) => (
+                  <MCard
+                    key={`nsfw-${video.id}`}
+                    video={video}
+                    variant='doc'
+                    stats={video.stats}
+                    showDelete={isAdmin && isLibraryVideo(video)}
+                    onDelete={requestDelete}
+                    onPlay={setPlaying}
+                    isFavorite={favorites.includes(video.id)}
+                    onToggleFavorite={(videoItem) => {
+                      if (typeof toggleFavorite === "function")
+                        toggleFavorite(videoItem.id);
+                    }}
+                    onShare={shareVideo}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className='bf-showcase__empty'>No NSFW videos available.</div>
             )}
           </section>
         ) : (
