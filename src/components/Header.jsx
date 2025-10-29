@@ -11,6 +11,7 @@ const navLinks = [
   { to: "/vids", label: "Vids" },
   { to: "/favorites", label: "Favorites" },
   { to: "/about", label: "About" },
+  { to: "/nsfw", label: "NSFW" },
 ];
 
 export default function Header({ search, setSearch }) {
