@@ -1464,7 +1464,8 @@ export default function Library({
   const displayName = DEFAULT_NAME;
   const profilePhoto = DEFAULT_PROFILE_PHOTO;
   const profileWallpaper = DEFAULT_PROFILE_WALLPAPER;
-  const profileBio = profile?.bio?.trim() || "";
+  const profileBio =
+    "Jaytee is a visionary filmmaker, designer, and software engineer who merges cinematic storytelling with modern technology. His background in React development, AI/ML, and cinematic editing allows him to bridge art and engineering — transforming powerful ideas into immersive, intelligent visual stories that inspire, inform, and connect audiences around the world.";
   const aboutWallpaperStyle = useMemo(
     () =>
       profileWallpaper
