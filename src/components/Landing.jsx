@@ -66,7 +66,6 @@ export default function Landing() {
       }
     : {};
 
-  const showFallbackImage = false;
   const quickLinks = [
     {
       id: "quick-1",
@@ -107,7 +106,14 @@ export default function Landing() {
             )}
           </div>
         </div>
-        {showFallbackImage ? null : null}
+        <aside className='landing__logoPreview' aria-label='Beechwood Films badge preview'>
+          <img
+            src='/logo-variation5.svg'
+            alt='Beechwood Films badge logo preview'
+            loading='lazy'
+          />
+          <span className='landing__logoCaption'>Badge preview · variation 5</span>
+        </aside>
       </section>
 
       {quickLinks.length > 0 ? (

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarpanch:wght@500;700;800&display=swap');
+
+    .bg { fill: #06070f; }
+    .text { fill: #ffffff; font-family: 'Sarpanch', sans-serif; }
+    .headline { font-size: 130px; font-weight: 800; letter-spacing: 4px; }
+    .subline { font-size: 46px; font-weight: 500; letter-spacing: 14px; text-transform: uppercase; }
+    .glasses-frame { fill: none; stroke: #ffffff; stroke-width: 20; rx: 26; ry: 26; }
+    .glasses-bridge { fill: #ffffff; }
+    .flare { stroke: #ffffff; stroke-width: 6; stroke-linecap: round; }
+  </style>
+  <rect class="bg" width="1200" height="360" rx="32" />
+
+  <!-- Left segment -->
+  <text class="text headline" x="90" y="185">b</text>
+
+  <!-- Double-e glasses -->
+  <g transform="translate(210,80)">
+    <rect class="glasses-frame" x="0" y="0" width="160" height="120" />
+    <rect class="glasses-frame" x="200" y="0" width="160" height="120" />
+    <rect class="glasses-bridge" x="160" y="48" width="40" height="24" rx="8" />
+    <line class="flare" x1="40" y1="32" x2="64" y2="52" />
+    <line class="flare" x1="240" y1="32" x2="264" y2="52" />
+  </g>
+
+  <!-- Remaining letters -->
+  <text class="text headline" x="580" y="185">chwood</text>
+  <text class="text subline" x="324" y="285">Films</text>
+</svg>
