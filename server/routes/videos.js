@@ -37,7 +37,8 @@ const LIBRARY_ALIASES = {
   short: "Reels",
   docs: "Documentaries",
   documentaries: "Documentaries",
-  documentary: "Documentaries"
+  documentary: "Documentaries",
+  nsfw: "NSFW"
 };
 
 const normalizeLibrary = (value) => {

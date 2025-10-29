@@ -10,8 +10,8 @@ const navLinks = [
   { to: "/reels", label: "Reels" },
   { to: "/vids", label: "Vids" },
   { to: "/favorites", label: "Favorites" },
-  { to: "/about", label: "About" },
   { to: "/nsfw", label: "NSFW" },
+  { to: "/about", label: "About" },
 ];
 
 export default function Header({ search, setSearch }) {
