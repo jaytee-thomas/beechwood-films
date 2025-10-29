@@ -1,6 +1,7 @@
 import db from "./client.js";
 import { createDefaultProfile, profileFields } from "../../shared/defaultProfile.js";
 import { seedVideosFromFallback } from "./fallback.js";
+import { createDefaultContent } from "../../shared/defaultContent.js";
 
 const PROFILE_ID = "default_profile";
 const shouldSeedSampleVideos = process.env.SEED_SAMPLE_VIDEOS === "true";
@@ -70,6 +71,11 @@ const createTables = () => {
       instagram TEXT,
       facebook TEXT,
       updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS content (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -226,6 +232,19 @@ const purgeSeedVideos = () => {
   db.prepare("DELETE FROM videos WHERE source = 'seed'").run();
 };
 
+const seedContentIfEmpty = () => {
+  const row = db.prepare("SELECT COUNT(*) as count FROM content").get();
+  if (row.count > 0) return;
+  const defaults = createDefaultContent();
+  const insert = db.prepare("INSERT INTO content (key, value) VALUES (@key, @value)");
+  const runMany = db.transaction((entries) => {
+    for (const [key, value] of entries) {
+      insert.run({ key, value });
+    }
+  });
+  runMany(Object.entries(defaults));
+};
+
 export const initializeDatabase = () => {
   createTables();
   ensureProfileColumns();
@@ -233,6 +252,7 @@ export const initializeDatabase = () => {
     seedVideosIfEmpty();
   }
   seedProfileIfMissing();
+  seedContentIfEmpty();
   purgeSampleProfileMedia();
   if (!shouldSeedSampleVideos) {
     purgeSeedVideos();

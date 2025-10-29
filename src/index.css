@@ -1445,6 +1445,18 @@ body {
   padding: 12px 6px 6px 6px;
 }
 
+.bf-label--inline > .bf-radioRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: rgba(237, 239, 255, 0.82);
+}
+
+.bf-radioRow input[type="radio"] {
+  margin-right: 6px;
+}
+
 .bf-label {
   display: grid;
   gap: 6px;
