@@ -106,11 +106,22 @@ function looksLikeVideoUrl(url) {
   );
 }
 
+const API_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+  (typeof process !== "undefined" && process.env?.VITE_API_URL) ||
+  "http://localhost:4000";
+
 export default function AddVideoModal({ open, onClose, onSave }) {
   const [title, setTitle] = useState("");
   const [thumbnail, setThumbnail] = useState("");
   const [duration, setDuration] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [mode, setMode] = useState("link"); // 'link' | 'upload'
+  const [uploadState, setUploadState] = useState({
+    fileName: "",
+    uploading: false,
+    error: "",
+  });
 
   const [previewOk, setPreviewOk] = useState(false);
   const [touched, setTouched] = useState({
@@ -127,6 +138,8 @@ export default function AddVideoModal({ open, onClose, onSave }) {
       setThumbnail("");
       setDuration("");
       setVideoUrl("");
+      setMode("link");
+      setUploadState({ fileName: "", uploading: false, error: "" });
       setPreviewOk(false);
       setTouched({ title: false, thumbnail: false, videoUrl: false });
     }
@@ -138,18 +151,80 @@ export default function AddVideoModal({ open, onClose, onSave }) {
     if (thumbnail.trim() && !isHttpUrl(thumbnail.trim())) {
       e.thumbnail = "Thumbnail must be an http/https URL.";
     }
-    if (!videoUrl.trim()) {
-      e.videoUrl = "Video URL is required.";
-    } else if (!looksLikeVideoUrl(videoUrl.trim())) {
-      e.videoUrl =
-        "Enter a direct video (.mp4/.mov/.webm/.m3u8) or a YouTube/Vimeo URL.";
+    if (mode === "link") {
+      if (!videoUrl.trim()) {
+        e.videoUrl = "Video URL is required.";
+      } else if (!looksLikeVideoUrl(videoUrl.trim())) {
+        e.videoUrl =
+          "Enter a direct video (.mp4/.mov/.webm/.m3u8) or a YouTube/Vimeo URL.";
+      }
+    } else if (mode === "upload") {
+      if (!videoUrl.trim()) {
+        e.videoUrl = "Upload a video file to continue.";
+      }
     }
     return e;
-  }, [title, thumbnail, videoUrl]);
+  }, [title, thumbnail, videoUrl, mode]);
 
   const hasErrors = Object.keys(errors).length > 0;
 
   if (!open) return null;
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+    const MAX_MB = 1024 * 1024 * 1024; // 1GB soft limit
+    if (file.size > MAX_MB) {
+      setUploadState({
+        fileName: file.name,
+        uploading: false,
+        error: "File is larger than 1 GB. Please upload a smaller video.",
+      });
+      return;
+    }
+
+    setUploadState({ fileName: file.name, uploading: true, error: "" });
+    try {
+      const res = await fetch(`${API_BASE}/api/uploads/presign`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to request upload URL.");
+      }
+
+      const { uploadUrl, fileUrl, headers } = await res.json();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: headers || {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Upload failed. Please try again.");
+      }
+
+      setVideoUrl(fileUrl);
+      setUploadState({ fileName: file.name, uploading: false, error: "" });
+    } catch (error) {
+      console.error("Upload failed", error);
+      setUploadState({
+        fileName: file.name,
+        uploading: false,
+        error: error.message || "Upload failed.",
+      });
+      setVideoUrl("");
+    }
+  };
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -259,6 +334,40 @@ export default function AddVideoModal({ open, onClose, onSave }) {
             />
           </label>
 
+          <label className='bf-label bf-label--inline'>
+            <span>Source</span>
+            <div className='bf-radioRow'>
+              <label>
+                <input
+                  type='radio'
+                  name='bf-video-source'
+                  value='link'
+                  checked={mode === "link"}
+                  onChange={() => {
+                    setMode("link");
+                    setVideoUrl("");
+                    setUploadState({ fileName: "", uploading: false, error: "" });
+                  }}
+                />
+                Link (YouTube/Vimeo/File URL)
+              </label>
+              <label>
+                <input
+                  type='radio'
+                  name='bf-video-source'
+                  value='upload'
+                  checked={mode === "upload"}
+                  onChange={() => {
+                    setMode("upload");
+                    setVideoUrl("");
+                    setUploadState({ fileName: "", uploading: false, error: "" });
+                  }}
+                />
+                Upload file
+              </label>
+            </div>
+          </label>
+
           <label className='bf-label'>
             Video URL
             <input
@@ -266,8 +375,13 @@ export default function AddVideoModal({ open, onClose, onSave }) {
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
               onBlur={() => setTouched((t) => ({ ...t, videoUrl: true }))}
-              placeholder='https://… (mp4/mov/webm/m3u8 or YouTube/Vimeo)'
+              placeholder={
+                mode === "upload"
+                  ? "Upload a file or paste a direct link"
+                  : "https://… (mp4/mov/webm/m3u8 or YouTube/Vimeo)"
+              }
               aria-invalid={!!errors.videoUrl}
+              disabled={mode === "upload"}
             />
             {touched.videoUrl && errors.videoUrl && (
               <div className='bf-error'>{errors.videoUrl}</div>
@@ -298,6 +412,31 @@ export default function AddVideoModal({ open, onClose, onSave }) {
               </div>
             )}
           </label>
+
+          {mode === "upload" && (
+            <label className='bf-label'>
+              Upload from device
+              <input
+                type='file'
+                accept='video/*'
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    handleUpload(file);
+                  }
+                }}
+              />
+              {uploadState.fileName && (
+                <div className='bf-help'>
+                  {uploadState.uploading
+                    ? `Uploading ${uploadState.fileName}…`
+                    : uploadState.error
+                    ? `Upload failed: ${uploadState.error}`
+                    : `Uploaded ${uploadState.fileName}`}
+                </div>
+              )}
+            </label>
+          )}
 
           <div className='bf-modalActions'>
             <button type='button' className='bf-btnSecondary' onClick={onClose}>
