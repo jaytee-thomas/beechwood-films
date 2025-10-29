@@ -5,6 +5,7 @@ import useContentStore from "../store/useContentStore";
 import useAdminPanel from "../store/useAdminPanel";
 import useAuth from "../store/useAuth";
 import { testimonials, clientLogos } from "../data/testimonials";
+import logoVariation5 from "../assets/logo-variation5.svg";
 
 const FEATURED_SETS = [
   {
@@ -107,11 +108,7 @@ export default function Landing() {
           </div>
         </div>
         <aside className='landing__logoPreview' aria-label='Beechwood Films badge preview'>
-          <img
-            src='/logo-variation5.svg'
-            alt='Beechwood Films badge logo preview'
-            loading='lazy'
-          />
+          <img src={logoVariation5} alt='Beechwood Films badge logo preview' loading='lazy' />
           <span className='landing__logoCaption'>Badge preview · variation 5</span>
         </aside>
       </section>
