@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 360">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#55d5ff" />
+      <stop offset="100%" stop-color="#6f5cff" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarpanch:wght@400;600&display=swap');
+
+    .bg { fill: #03040a; }
+    .text { fill: url(#grad); font-family: 'Sarpanch', sans-serif; }
+    .headline { font-size: 120px; font-weight: 600; letter-spacing: 10px; }
+    .subline { font-size: 44px; font-weight: 400; letter-spacing: 24px; text-transform: uppercase; }
+    .glowLens { fill: none; stroke: #6fd0ff; stroke-width: 18; filter: url(#glow); }
+    .innerLens { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 8; }
+  </style>
+
+  <rect class="bg" width="1400" height="360" rx="32" />
+
+  <text class="text headline" x="110" y="192">b</text>
+  <text class="text headline" x="1010" y="192">chwood</text>
+
+  <g transform="translate(290,74)">
+    <circle class="glowLens" cx="70" cy="70" r="70" />
+    <circle class="glowLens" cx="240" cy="70" r="70" />
+    <circle class="innerLens" cx="70" cy="70" r="52" />
+    <circle class="innerLens" cx="240" cy="70" r="52" />
+    <rect x="120" y="58" width="70" height="24" rx="10" fill="#6fd0ff" filter="url(#glow)" />
+  </g>
+
+  <text class="text subline" x="336" y="292" opacity="0.8">FILMS</text>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 360">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarpanch:wght@400;700&display=swap');
+
+    .bg { fill: #050609; }
+    .word { fill: #ffffff; font-family: 'Sarpanch', sans-serif; }
+    .headline { font-size: 128px; font-weight: 700; letter-spacing: 8px; }
+    .subline { font-size: 42px; font-weight: 400; letter-spacing: 18px; text-transform: uppercase; }
+    .viewfinder { fill: none; stroke: #ffffff; stroke-width: 14; rx: 24; ry: 24; }
+    .grid { stroke: rgba(255,255,255,0.25); stroke-width: 3; }
+    .bridge { fill: #151921; }
+  </style>
+  <rect class="bg" width="1400" height="360" rx="30" />
+
+  <text class="word headline" x="120" y="198">B</text>
+  <text class="word headline" x="1030" y="198">chwood</text>
+
+  <g transform="translate(300,78)">
+    <rect class="viewfinder" x="0" y="0" width="190" height="124" />
+    <rect class="viewfinder" x="230" y="0" width="190" height="124" />
+    <rect class="bridge" x="190" y="48" width="40" height="28" rx="10" />
+    <line class="grid" x1="30" y1="62" x2="160" y2="62" />
+    <line class="grid" x1="30" y1="32" x2="30" y2="94" />
+    <line class="grid" x1="260" y1="32" x2="260" y2="94" />
+    <line class="grid" x1="260" y1="62" x2="390" y2="62" />
+  </g>
+
+  <text class="word subline" x="880" y="290">FILMS</text>
+</svg>
