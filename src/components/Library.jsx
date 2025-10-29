@@ -9,7 +9,6 @@ import ReelsCard from "./ReelsCard.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import { isDashSource, isHlsSource } from "../utils/streaming.js";
 
-const DEFAULT_PROFILE_PHOTO = "/IMG_2669.JPG";
 const DEFAULT_PROFILE_WALLPAPER = "/wpNash2.JPG";
 const DEFAULT_HOME_WALLPAPER = "/WP1.jpg";
 const DEFAULT_NAME = "Jaytee Thomas";
@@ -793,7 +792,7 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       setName(DEFAULT_NAME);
       setBio(profile?.bio || "");
       setHometown(DEFAULT_HOMETOWN);
-      setPhoto(DEFAULT_PROFILE_PHOTO);
+      setPhoto(profile?.photo || "");
       setWallpaper(DEFAULT_PROFILE_WALLPAPER);
       setHomeWallpaper(settings?.homeWallpaper || DEFAULT_HOME_WALLPAPER);
       setPhone(profile?.phone || "");
@@ -1462,7 +1461,7 @@ export default function Library({
   const aboutHandle = DEFAULT_HANDLE;
   const hometownDisplay = DEFAULT_HOMETOWN;
   const displayName = DEFAULT_NAME;
-  const profilePhoto = DEFAULT_PROFILE_PHOTO;
+  const profilePhoto = profile?.photo?.trim() || "";
   const profileWallpaper = DEFAULT_PROFILE_WALLPAPER;
   const profileBio =
     "Jaytee is a visionary filmmaker, designer, and software engineer who merges cinematic storytelling with modern technology. His background in React development, AI/ML, and cinematic editing allows him to bridge art and engineering — transforming powerful ideas into immersive, intelligent visual stories that inspire, inform, and connect audiences around the world.";
