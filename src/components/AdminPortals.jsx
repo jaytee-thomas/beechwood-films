@@ -598,6 +598,16 @@ function UploadModal({ open, onClose, onAdd }) {
                 >
                   Reels
                 </button>
+                <button
+                  type='button'
+                  style={{
+                    ...S.typeBtn,
+                    ...(library === "nsfw" ? S.typeActive : {}),
+                  }}
+                  onClick={() => setLibrary("nsfw")}
+                >
+                  NSFW
+                </button>
               </div>
             </div>
             <label style={S.label}>

@@ -1612,7 +1612,7 @@ export default function Library({
     else if (activeSection === "home")
       list = list.filter((v) => {
         const tag = (v.library || "").toLowerCase();
-        return tag !== "reels";
+        return tag !== "reels" && tag !== "nsfw";
       });
 
     if (search?.trim()) {

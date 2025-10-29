@@ -42,6 +42,7 @@ export default function App() {
         <Route path='/favorites' element={<Library mode='favorites' search={search} />} />
         <Route path='/vids' element={<Library mode='vids' search={search} />} />
         <Route path='/reels' element={<Library mode='reels' search={search} />} />
+        <Route path='/nsfw' element={<Library mode='nsfw' search={search} />} />
         <Route path='/watch/:id' element={<Player />} />
         <Route path='*' element={<Navigate to='/' replace />} />
       </Routes>
