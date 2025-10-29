@@ -51,8 +51,10 @@ const VIDEO_MIME_TYPES = {
   mpd: "application/dash+xml",
 };
 
-const isYouTube = (url = "") => YOUTUBE_PATTERNS.some((pattern) => pattern.test(url));
-const isVimeo = (url = "") => VIMEO_PATTERNS.some((pattern) => pattern.test(url));
+const isYouTube = (url = "") =>
+  YOUTUBE_PATTERNS.some((pattern) => pattern.test(url));
+const isVimeo = (url = "") =>
+  VIMEO_PATTERNS.some((pattern) => pattern.test(url));
 
 const getYouTubeId = (url = "") => {
   for (const pattern of YOUTUBE_PATTERNS) {
@@ -181,7 +183,12 @@ const parseAspectRatioValue = (input, fallbackWidth, fallbackHeight) => {
       }
     }
   }
-  if (Number.isFinite(fallbackWidth) && Number.isFinite(fallbackHeight) && fallbackWidth > 0 && fallbackHeight > 0) {
+  if (
+    Number.isFinite(fallbackWidth) &&
+    Number.isFinite(fallbackHeight) &&
+    fallbackWidth > 0 &&
+    fallbackHeight > 0
+  ) {
     return fallbackWidth / fallbackHeight;
   }
   return null;
@@ -285,7 +292,8 @@ function PlayerOverlay({ video, onClose }) {
       .filter((source) => {
         const url = source.url || "";
         if (!url) return false;
-        if (url.startsWith("blob:") || url.startsWith("data:video")) return true;
+        if (url.startsWith("blob:") || url.startsWith("data:video"))
+          return true;
         if (!/^https?:/i.test(url)) return false;
         if (isYouTube(url) || isVimeo(url)) return false;
         return true;
@@ -293,12 +301,16 @@ function PlayerOverlay({ video, onClose }) {
   }, [sources]);
 
   const streamingSources = useMemo(
-    () => normalizedSources.filter((src) => isHlsSource(src) || isDashSource(src)),
+    () =>
+      normalizedSources.filter((src) => isHlsSource(src) || isDashSource(src)),
     [normalizedSources]
   );
 
   const fileSources = useMemo(
-    () => normalizedSources.filter((src) => !isHlsSource(src) && !isDashSource(src)),
+    () =>
+      normalizedSources.filter(
+        (src) => !isHlsSource(src) && !isDashSource(src)
+      ),
     [normalizedSources]
   );
 
@@ -370,7 +382,8 @@ function PlayerOverlay({ video, onClose }) {
           youtubeReferenceUrl,
           "https://www.youtube.com/watch?v=" + youtubeId
         );
-        const startParam = parsed.searchParams.get("t") || parsed.searchParams.get("start");
+        const startParam =
+          parsed.searchParams.get("t") || parsed.searchParams.get("start");
         const playlist = parsed.searchParams.get("list");
         if (startParam) {
           const seconds = parseTimecode(startParam);
@@ -393,7 +406,10 @@ function PlayerOverlay({ video, onClose }) {
     let url = `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
     if (vimeoReferenceUrl) {
       try {
-        const parsed = new URL(vimeoReferenceUrl, "https://vimeo.com/" + vimeoId);
+        const parsed = new URL(
+          vimeoReferenceUrl,
+          "https://vimeo.com/" + vimeoId
+        );
         const startParam =
           parsed.searchParams.get("t") ||
           parsed.hash?.replace(/^#t=/i, "") ||
@@ -422,7 +438,10 @@ function PlayerOverlay({ video, onClose }) {
   const videoData = video || {};
 
   const tagTokens = Array.isArray(videoData.tags)
-    ? videoData.tags.filter((tag) => typeof tag === "string").join(" ").toLowerCase()
+    ? videoData.tags
+        .filter((tag) => typeof tag === "string")
+        .join(" ")
+        .toLowerCase()
     : typeof videoData.tags === "string"
     ? videoData.tags.toLowerCase()
     : "";
@@ -452,7 +471,11 @@ function PlayerOverlay({ video, onClose }) {
     isVerticalAspect ||
     orientationToken === "portrait";
 
-  const rawAspect = videoData.aspectRatio || videoData.aspect || videoData.displayAspectRatio || "";
+  const rawAspect =
+    videoData.aspectRatio ||
+    videoData.aspect ||
+    videoData.displayAspectRatio ||
+    "";
   const numericAspect = useMemo(
     () =>
       parseAspectRatioValue(
@@ -460,7 +483,13 @@ function PlayerOverlay({ video, onClose }) {
         Number(videoData.width ?? videoData.videoWidth),
         Number(videoData.height ?? videoData.videoHeight)
       ),
-    [rawAspect, videoData.height, videoData.videoHeight, videoData.width, videoData.videoWidth]
+    [
+      rawAspect,
+      videoData.height,
+      videoData.videoHeight,
+      videoData.width,
+      videoData.videoWidth,
+    ]
   );
   const defaultAspect = isVerticalAspect ? 9 / 16 : 16 / 9;
   const stageAspect = isReel ? 260 / 452 : numericAspect || defaultAspect;
@@ -637,8 +666,18 @@ function PlayerOverlay({ video, onClose }) {
     : { margin: 0, fontSize: "1.08rem", fontWeight: 700, color: "#f5f7ff" };
 
   const infoStyle = isReel
-    ? { display: "flex", gap: 12, fontSize: "0.82rem", color: "rgba(167, 173, 214, 0.88)" }
-    : { display: "flex", gap: 14, color: "rgba(207, 211, 244, 0.82)", fontSize: "0.9rem" };
+    ? {
+        display: "flex",
+        gap: 12,
+        fontSize: "0.82rem",
+        color: "rgba(167, 173, 214, 0.88)",
+      }
+    : {
+        display: "flex",
+        gap: 14,
+        color: "rgba(207, 211, 244, 0.82)",
+        fontSize: "0.9rem",
+      };
 
   const fallbackStyle = isReel
     ? {
@@ -735,8 +774,14 @@ function PlayerOverlay({ video, onClose }) {
             <div style={fallbackStyle}>
               {streamFallback ? (
                 <p>
-                  This video uses a streaming format ({isHlsSource(streamFallback) ? "HLS" : "MPEG-DASH"}). Open it in a compatible player: {" "}
-                  <a href={streamFallback.url} target='_blank' rel='noreferrer noopener'>
+                  This video uses a streaming format (
+                  {isHlsSource(streamFallback) ? "HLS" : "MPEG-DASH"}). Open it
+                  in a compatible player:{" "}
+                  <a
+                    href={streamFallback.url}
+                    target='_blank'
+                    rel='noreferrer noopener'
+                  >
                     {streamFallback.url}
                   </a>{" "}
                   or upload an MP4/WebM version for in-browser playback.
@@ -775,7 +820,9 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
   const [hometown, setHometown] = useState(profile?.hometown || "");
   const [photo, setPhoto] = useState(profile?.photo || "");
   const [wallpaper, setWallpaper] = useState(profile?.wallpaper || "");
-  const [homeWallpaper, setHomeWallpaper] = useState(settings?.homeWallpaper || "");
+  const [homeWallpaper, setHomeWallpaper] = useState(
+    settings?.homeWallpaper || ""
+  );
   const [phone, setPhone] = useState(profile?.phone || "");
   const [email, setEmail] = useState(profile?.email || "");
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || "");
@@ -999,7 +1046,10 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
       cursor: "pointer",
       fontWeight: 600,
     },
-    primary: { background: "var(--accent-gradient)", borderColor: "var(--accent-border)" },
+    primary: {
+      background: "var(--accent-gradient)",
+      borderColor: "var(--accent-border)",
+    },
     close: {
       background: "transparent",
       border: "none",
@@ -1089,7 +1139,9 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
                 Clear background
               </button>
             </div>
-            <span style={S.help}>Use a wide image (16:9) for best results. Files up to 5 MB.</span>
+            <span style={S.help}>
+              Use a wide image (16:9) for best results. Files up to 5 MB.
+            </span>
           </label>
 
           <label style={S.label}>
@@ -1126,7 +1178,10 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
                 Clear home background
               </button>
             </div>
-            <span style={S.help}>Shown on the landing page. Wide images (16:9) look best. Up to 5 MB.</span>
+            <span style={S.help}>
+              Shown on the landing page. Wide images (16:9) look best. Up to 5
+              MB.
+            </span>
           </label>
 
           <label style={S.label}>
@@ -1233,7 +1288,12 @@ function EditProfileModal({ open, onClose, profile, onSave }) {
         <div style={S.footer}>
           {submitError ? <p style={S.error}>{submitError}</p> : null}
           <div style={S.actions}>
-            <button type='button' style={S.btn} onClick={onClose} disabled={saving}>
+            <button
+              type='button'
+              style={S.btn}
+              onClick={onClose}
+              disabled={saving}
+            >
               Cancel
             </button>
             <button
@@ -1292,15 +1352,17 @@ export default function Library({
       video.stats?.views ??
       null;
     const numericViews = Number(rawViews);
-    const viewsLabel = Number.isFinite(numericViews) && numericViews > 0
-      ? formatViews(numericViews)
-      : typeof rawViews === "string"
-      ? rawViews
-      : undefined;
+    const viewsLabel =
+      Number.isFinite(numericViews) && numericViews > 0
+        ? formatViews(numericViews)
+        : typeof rawViews === "string"
+        ? rawViews
+        : undefined;
     const ageSource = video.postedAt || video.date || video.createdAt;
     const ageLabel = ageSource ? formatAge(ageSource) : undefined;
     const duration =
-      video.duration || FALLBACK_REEL_DURATIONS[index % FALLBACK_REEL_DURATIONS.length];
+      video.duration ||
+      FALLBACK_REEL_DURATIONS[index % FALLBACK_REEL_DURATIONS.length];
 
     return {
       ...video,
@@ -1385,7 +1447,11 @@ export default function Library({
     const durationLabel =
       video.duration || video.runtime || video.metrics?.runtime || null;
     const publishedAt =
-      video.date || video.postedAt || video.createdAt || video.updatedAt || null;
+      video.date ||
+      video.postedAt ||
+      video.createdAt ||
+      video.updatedAt ||
+      null;
     const ageLabel = publishedAt ? formatAge(publishedAt) : undefined;
     const stats =
       durationLabel || ageLabel
@@ -1431,7 +1497,10 @@ export default function Library({
     push("facebook", "Facebook", profile?.facebook);
     return links;
   }, [profile]);
-  const sanitizePhone = useCallback((value = "") => value.replace(/[^\d+]/g, ""), []);
+  const sanitizePhone = useCallback(
+    (value = "") => value.replace(/[^\d+]/g, ""),
+    []
+  );
   const contactItems = useMemo(() => {
     const phoneValue = profile?.phone?.trim() || "";
     const emailValue = profile?.email?.trim() || "";
@@ -1453,7 +1522,10 @@ export default function Library({
       {
         label: "WhatsApp",
         value: whatsappValue,
-        href: whatsappValue && whatsappSanitized ? `https://wa.me/${whatsappSanitized}` : null,
+        href:
+          whatsappValue && whatsappSanitized
+            ? `https://wa.me/${whatsappSanitized}`
+            : null,
         placeholder: "Add your WhatsApp",
       },
     ];
@@ -1471,7 +1543,7 @@ export default function Library({
         ? { "--about-wallpaper": `url("${profileWallpaper}")` }
         : {
             "--about-wallpaper":
-              "linear-gradient(135deg, rgba(23, 25, 42, 0.92), rgba(10, 11, 20, 0.94))"
+              "linear-gradient(135deg, rgba(23, 25, 42, 0.92), rgba(10, 11, 20, 0.94))",
           },
     [profileWallpaper]
   );
@@ -1498,11 +1570,15 @@ export default function Library({
     setFallbackPending(true);
     try {
       await saveFallback();
-      window.alert("Current library saved as fallback. It will preload on a fresh deploy.");
+      window.alert(
+        "Current library saved as fallback. It will preload on a fresh deploy."
+      );
       setFallbackSaved(true);
     } catch (error) {
       console.error("Failed to save fallback", error);
-      window.alert(error.message || "Could not save fallback. Please try again.");
+      window.alert(
+        error.message || "Could not save fallback. Please try again."
+      );
       setFallbackSaved(false);
     } finally {
       setFallbackPending(false);
@@ -1518,12 +1594,15 @@ export default function Library({
     if (activeSection === "vids")
       list = list.filter((v) => {
         const tag = (v.library || "").toLowerCase();
-        return tag === "vids" || tag === "videos" || tag === "docs" || tag === "documentaries";
+        return (
+          tag === "vids" ||
+          tag === "videos" ||
+          tag === "docs" ||
+          tag === "documentaries"
+        );
       });
     else if (activeSection === "reels")
-      list = list.filter(
-        (v) => (v.library || "").toLowerCase() === "reels"
-      );
+      list = list.filter((v) => (v.library || "").toLowerCase() === "reels");
     else if (activeSection === "favorites")
       list = list.filter((v) => favorites.includes(v.id));
     else if (activeSection === "home")
@@ -1572,7 +1651,8 @@ export default function Library({
   const favoritesPageCards = useMemo(() => {
     if (activeSection !== "favorites") return [];
     return filtered.map((video, index) => {
-      const type = (video.library || "").toLowerCase() === "reels" ? "reel" : "video";
+      const type =
+        (video.library || "").toLowerCase() === "reels" ? "reel" : "video";
       return {
         type,
         data: type === "reel" ? enrichReel(video, index) : enrichVideo(video),
@@ -1582,7 +1662,8 @@ export default function Library({
 
   const mixedCards = useMemo(() => {
     return filtered.map((video, index) => {
-      const type = (video.library || "").toLowerCase() === "reels" ? "reel" : "video";
+      const type =
+        (video.library || "").toLowerCase() === "reels" ? "reel" : "video";
       return {
         type,
         data: type === "reel" ? enrichReel(video, index) : enrichVideo(video),
@@ -1591,7 +1672,11 @@ export default function Library({
   }, [filtered, enrichReel, enrichVideo]);
 
   const isLibraryVideo = useCallback(
-    (video) => Boolean(video) && (typeof video.id === "number" || video.source === "custom" || video.__fromLibrary),
+    (video) =>
+      Boolean(video) &&
+      (typeof video.id === "number" ||
+        video.source === "custom" ||
+        video.__fromLibrary),
     []
   );
 
@@ -1613,7 +1698,9 @@ export default function Library({
       }
       setDeleteTarget(null);
     } catch (error) {
-      window.alert(error.message || "Could not delete video. Check your admin access.");
+      window.alert(
+        error.message || "Could not delete video. Check your admin access."
+      );
     }
   }, [deleteTarget, removeVideo, playing, setPlaying]);
 
@@ -1653,124 +1740,141 @@ export default function Library({
       )}
 
       <main
-        className={`bf-libraryMain${activeSection === "about" ? " is-about" : ""}`}
+        className={`bf-libraryMain${
+          activeSection === "about" ? " is-about" : ""
+        }`}
         role='main'
       >
-          {isAdmin && (
-            <div className='bf-adminActionsRow'>
-              <label className={`bf-toggle ${fallbackPending ? "is-disabled" : ""}`}>
-                <input
-                  type='checkbox'
-                  className='bf-toggle__input'
-                  onChange={handleSetFallback}
-                  checked={fallbackSaved}
-                  disabled={fallbackPending || videos.length === 0}
-                />
-                <span className='bf-toggle__track'>
-                  <span className='bf-toggle__thumb' />
-                </span>
-                <span className='bf-toggle__label'>
-                  {fallbackPending
-                    ? "Saving fallback…"
-                    : fallbackSaved
-                    ? "Fallback saved"
-                    : "Snapshot current uploads as fallback"}
-                </span>
-              </label>
-            </div>
-          )}
-          {activeSection === "about" ? (
-            <section
-              className='bf-aboutWallpaperSection'
-              style={aboutWallpaperStyle}
-              aria-label='About portrait'
+        {isAdmin && (
+          <div className='bf-adminActionsRow'>
+            <label
+              className={`bf-toggle ${fallbackPending ? "is-disabled" : ""}`}
             >
-              {isAdmin && (
-                <button
-                  type='button'
-                  className='bf-aboutEditBtn is-floating'
-                  onClick={() => setShowProfileEdit(true)}
-                >
-                  <Pencil size={16} />
-                  <span>Edit Profile</span>
-                </button>
-              )}
-              <div className='bf-aboutWallpaperContent'>
-                <section className='bf-aboutSection is-full' aria-label='About profile'>
-                  <div className='bf-aboutProfileCard'>
-                    <div className='bf-aboutAvatarFlow'>
-                      {profilePhoto ? (
-                        <img
-                          src={profilePhoto}
-                          alt={`${displayName} portrait`}
-                        />
-                      ) : (
-                        <div className='bf-aboutAvatarPlaceholder'>Add photo</div>
-                      )}
-                    </div>
-                    <div className='bf-aboutProfileStack'>
-                      <span className='bf-aboutPrimaryHandle'>{aboutHandle}</span>
-                      <h1 className='bf-aboutName'>{displayName}</h1>
-                      <p className='bf-aboutSubline'>Based in {hometownDisplay}</p>
-                    </div>
+              <input
+                type='checkbox'
+                className='bf-toggle__input'
+                onChange={handleSetFallback}
+                checked={fallbackSaved}
+                disabled={fallbackPending || videos.length === 0}
+              />
+              <span className='bf-toggle__track'>
+                <span className='bf-toggle__thumb' />
+              </span>
+              <span className='bf-toggle__label'>
+                {fallbackPending
+                  ? "Saving fallback…"
+                  : fallbackSaved
+                  ? "Fallback saved"
+                  : "Snapshot current uploads as fallback"}
+              </span>
+            </label>
+          </div>
+        )}
+        {activeSection === "about" ? (
+          <section
+            className='bf-aboutWallpaperSection'
+            style={aboutWallpaperStyle}
+            aria-label='About portrait'
+          >
+            {isAdmin && (
+              <button
+                type='button'
+                className='bf-aboutEditBtn is-floating'
+                onClick={() => setShowProfileEdit(true)}
+              >
+                <Pencil size={16} />
+                <span>Edit Profile</span>
+              </button>
+            )}
+            <div className='bf-aboutWallpaperContent'>
+              <section
+                className='bf-aboutSection is-full'
+                aria-label='About profile'
+              >
+                <div className='bf-aboutProfileCard'>
+                  <div className='bf-aboutAvatarFlow'>
+                    {profilePhoto ? (
+                      <img src={profilePhoto} alt={`${displayName} portrait`} />
+                    ) : (
+                      <div className='bf-aboutAvatarPlaceholder'>Add photo</div>
+                    )}
                   </div>
-                  <div className='bf-aboutColumnsFlow'>
-                    <section aria-label='Bio card'>
-                      <h3>Bio</h3>
-                      <p>{profileBio || "Use the edit button to tell your story."}</p>
-                    </section>
-                    <section aria-label='Contact information'>
-                      <h3>Contact</h3>
-                      <ul>
-                        {contactItems.map((item) => (
-                          <li key={item.label}>
-                            <span>{item.label}</span>
-                            {item.value ? (
-                              item.href ? (
-                                <a href={item.href}>{item.value}</a>
-                              ) : (
-                                <span>{item.value}</span>
-                              )
+                  <div className='bf-aboutProfileStack'>
+                    <span className='bf-aboutPrimaryHandle'>{aboutHandle}</span>
+                    <h1 className='bf-aboutName'>{displayName}</h1>
+                    <p className='bf-aboutSubline'>
+                      Based in {hometownDisplay}
+                    </p>
+                  </div>
+                </div>
+                <div className='bf-aboutColumnsFlow'>
+                  <section aria-label='Bio card'>
+                    <h3>Bio</h3>
+                    <p>
+                      {profileBio || "Use the edit button to tell your story."}
+                    </p>
+                  </section>
+                  <section aria-label='Contact information'>
+                    <h3>Contact</h3>
+                    <ul>
+                      {contactItems.map((item) => (
+                        <li key={item.label}>
+                          <span>{item.label}</span>
+                          {item.value ? (
+                            item.href ? (
+                              <a href={item.href}>{item.value}</a>
                             ) : (
-                              <span className='bf-aboutPlaceholder'>{item.placeholder}</span>
-                            )}
+                              <span>{item.value}</span>
+                            )
+                          ) : (
+                            <span className='bf-aboutPlaceholder'>
+                              {item.placeholder}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                  <section aria-label='Social links'>
+                    <h3>Social</h3>
+                    {socialLinks.length > 0 ? (
+                      <ul>
+                        {socialLinks.map((link) => (
+                          <li key={link.label}>
+                            <span>{link.label}</span>
+                            <a
+                              href={link.href}
+                              target='_blank'
+                              rel='noreferrer noopener'
+                            >
+                              {link.text}
+                            </a>
                           </li>
                         ))}
                       </ul>
-                    </section>
-                    <section aria-label='Social links'>
-                      <h3>Social</h3>
-                      {socialLinks.length > 0 ? (
-                        <ul>
-                          {socialLinks.map((link) => (
-                            <li key={link.label}>
-                              <span>{link.label}</span>
-                              <a href={link.href} target='_blank' rel='noreferrer noopener'>
-                                {link.text}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className='bf-aboutPlaceholder'>{aboutHandle}</span>
-                      )}
-                    </section>
-                  </div>
-                </section>
-              </div>
-            </section>
-          ) : activeSection === "home" ? (
-            <>
-              <section className='bf-showcase' aria-label='Library spotlight videos'>
-                <div className='bf-showcase__head'>
-                  <h2 className='bf-showcase__title'>Library Spotlight</h2>
-                  <p className='bf-showcase__subtitle'>
-                    Fresh pulls from the Beechwood catalog for quick sharing
-                  </p>
+                    ) : (
+                      <span className='bf-aboutPlaceholder'>{aboutHandle}</span>
+                    )}
+                  </section>
                 </div>
-                {showcaseCards.length > 0 ? (
-                  <div className='bf-showcase__row'>
-                    {showcaseCards.map((video) => (
+              </section>
+            </div>
+          </section>
+        ) : activeSection === "home" ? (
+          <>
+            <section
+              className='bf-showcase'
+              aria-label='Library spotlight videos'
+            >
+              <div className='bf-showcase__head'>
+                <h2 className='bf-showcase__title'>Library Spotlight</h2>
+                <p className='bf-showcase__subtitle'>
+                  Fresh pulls from the Beechwood catalog for quick sharing
+                </p>
+              </div>
+              {showcaseCards.length > 0 ? (
+                <div className='bf-showcase__row'>
+                  {showcaseCards.map((video) => (
                     <MCard
                       key={video.id}
                       video={video}
@@ -1787,55 +1891,26 @@ export default function Library({
                       onShare={shareVideo}
                       stats={video.stats}
                     />
-                    ))}
-                  </div>
-                ) : (
-                  <div className='bf-showcase__empty'>No feature videos yet.</div>
-                )}
-              </section>
-
-              <section className='bf-showcase bf-showcase--reels' aria-label='Latest reels'>
-                <div className='bf-showcase__head'>
-                  <h2 className='bf-showcase__title'>Reels</h2>
-                  <p className='bf-showcase__subtitle'>
-                    Quick-hit edits ready to share with clients
-                  </p>
+                  ))}
                 </div>
-                {reelCards.length > 0 ? (
-                  <div className='bf-showcase__row'>
-                    {reelCards.map((video) => (
-                      <ReelsCard
-                        key={`reel-${video.id}`}
-                        video={video}
-                        isFavorite={favorites.includes(video.id)}
-                        showDelete={isAdmin && isLibraryVideo(video)}
-                        onPlay={setPlaying}
-                        onToggleFavorite={(videoItem) => {
-                          if (typeof toggleFavorite === "function")
-                            toggleFavorite(videoItem.id);
-                          }}
-                        onDelete={requestDelete}
-                        onShare={shareVideo}
-                        stats={video.stats}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className='bf-showcase__empty'>
-                    Add a reel to your library to feature it here.
-                  </div>
-                )}
-              </section>
-            </>
-          ) : activeSection === "reels" ? (
-            <section className='bf-showcase bf-showcase--reels' aria-label='Reels library'>
+              ) : (
+                <div className='bf-showcase__empty'>No feature videos yet.</div>
+              )}
+            </section>
+
+            <section
+              className='bf-showcase bf-showcase--reels'
+              aria-label='Latest reels'
+            >
               <div className='bf-showcase__head'>
-                <h2 className='bf-showcase__title'>Reels Library</h2>
-                <p className='bf-showcase__subtitle'>Add reels to your library to see them here.</p>
+                <h2 className='bf-showcase__title'>Reels</h2>
+                <p className='bf-showcase__subtitle'>
+                  Quick-hit edits ready to share with clients
+                </p>
               </div>
-              {reelsPageCards.length > 0 ? (
+              {reelCards.length > 0 ? (
                 <div className='bf-showcase__row'>
-                  {reelsPageCards.map((video) => (
+                  {reelCards.map((video) => (
                     <ReelsCard
                       key={`reel-${video.id}`}
                       video={video}
@@ -1853,99 +1928,103 @@ export default function Library({
                   ))}
                 </div>
               ) : (
-                <div className='bf-showcase__empty'>No reels in your library yet.</div>
-              )}
-            </section>
-          ) : activeSection === "vids" ? (
-            <section className='bf-showcase bf-showcase--vids' aria-label='Vids library'>
-              <div className='bf-showcase__head'>
-                <h2 className='bf-showcase__title'>Vids Library</h2>
-                <p className='bf-showcase__subtitle'>All the long-form stories and behind-the-scenes features.</p>
-              </div>
-              {vidsPageCards.length > 0 ? (
-                <div className='bf-showcase__row'>
-                  {vidsPageCards.map((video) => (
-                    <MCard
-                      key={`vid-${video.id}`}
-                      video={video}
-                      variant='doc'
-                      stats={video.stats}
-                      showDelete={isAdmin && isLibraryVideo(video)}
-                      onDelete={requestDelete}
-                      onPlay={setPlaying}
-                      isFavorite={favorites.includes(video.id)}
-                      onToggleFavorite={(videoItem) => {
-                        if (typeof toggleFavorite === "function")
-                          toggleFavorite(videoItem.id);
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
                 <div className='bf-showcase__empty'>
-                  No vids matched your search.
+                  Add a reel to your library to feature it here.
                 </div>
               )}
             </section>
-          ) : activeSection === "favorites" ? (
-            <section className='bf-showcase bf-showcase--favorites' aria-label='Favorites library'>
-              <div className='bf-showcase__head'>
-                <h2 className='bf-showcase__title'>Favorites Library</h2>
-                <p className='bf-showcase__subtitle'>Hand-picked clips you’ve saved for quick access.</p>
+          </>
+        ) : activeSection === "reels" ? (
+          <section
+            className='bf-showcase bf-showcase--reels'
+            aria-label='Reels library'
+          >
+            <div className='bf-showcase__head'>
+              <h2 className='bf-showcase__title'>Reels Library</h2>
+              <p className='bf-showcase__subtitle'>
+                Add reels to your library to see them here.
+              </p>
+            </div>
+            {reelsPageCards.length > 0 ? (
+              <div className='bf-showcase__row'>
+                {reelsPageCards.map((video) => (
+                  <ReelsCard
+                    key={`reel-${video.id}`}
+                    video={video}
+                    isFavorite={favorites.includes(video.id)}
+                    showDelete={isAdmin && isLibraryVideo(video)}
+                    onPlay={setPlaying}
+                    onToggleFavorite={(videoItem) => {
+                      if (typeof toggleFavorite === "function")
+                        toggleFavorite(videoItem.id);
+                    }}
+                    onDelete={requestDelete}
+                    onShare={shareVideo}
+                    stats={video.stats}
+                  />
+                ))}
               </div>
-              {favoritesPageCards.length > 0 ? (
-                <div className='bf-showcase__row'>
-                  {favoritesPageCards.map((item) =>
-                    item.type === "reel" ? (
-                      <ReelsCard
-                        key={`fav-reel-${item.data.id}`}
-                        video={item.data}
-                        isFavorite
-                        showDelete={isAdmin && isLibraryVideo(item.data)}
-                        onDelete={requestDelete}
-                        onPlay={setPlaying}
-                        onToggleFavorite={(videoItem) => {
-                          if (typeof toggleFavorite === "function")
-                            toggleFavorite(videoItem.id);
-                        }}
-                        onShare={shareVideo}
-                        stats={item.data.stats}
-                      />
-                    ) : (
-                      <MCard
-                        key={`fav-vid-${item.data.id}`}
-                        video={item.data}
-                        variant='doc'
-                        showDelete={isAdmin && isLibraryVideo(item.data)}
-                        onDelete={requestDelete}
-                        onPlay={setPlaying}
-                        isFavorite
-                        onToggleFavorite={(videoItem) => {
-                          if (typeof toggleFavorite === "function")
-                            toggleFavorite(videoItem.id);
-                        }}
-                        onShare={shareVideo}
-                        stats={item.data.stats}
-                      />
-                    )
-                  )}
-                </div>
-              ) : (
-                <div className='bf-showcase__empty'>You haven’t favorited any videos yet.</div>
-              )}
-            </section>
-          ) : (
-            <div id='library-grid' className='bf-grid'>
-              {mixedCards.length === 0 ? (
-                <div className='bf-empty'>No videos found.</div>
-              ) : (
-                mixedCards.map((item) => {
-                  const isFav = favorites.includes(item.data.id);
-                  return item.type === "reel" ? (
+            ) : (
+              <div className='bf-showcase__empty'>
+                No reels in your library yet.
+              </div>
+            )}
+          </section>
+        ) : activeSection === "vids" ? (
+          <section
+            className='bf-showcase bf-showcase--vids'
+            aria-label='Vids library'
+          >
+            <div className='bf-showcase__head'>
+              <h2 className='bf-showcase__title'>Vids Library</h2>
+              <p className='bf-showcase__subtitle'>
+                All the long-form stories and behind-the-scenes features.
+              </p>
+            </div>
+            {vidsPageCards.length > 0 ? (
+              <div className='bf-showcase__row'>
+                {vidsPageCards.map((video) => (
+                  <MCard
+                    key={`vid-${video.id}`}
+                    video={video}
+                    variant='doc'
+                    stats={video.stats}
+                    showDelete={isAdmin && isLibraryVideo(video)}
+                    onDelete={requestDelete}
+                    onPlay={setPlaying}
+                    isFavorite={favorites.includes(video.id)}
+                    onToggleFavorite={(videoItem) => {
+                      if (typeof toggleFavorite === "function")
+                        toggleFavorite(videoItem.id);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className='bf-showcase__empty'>
+                No vids matched your search.
+              </div>
+            )}
+          </section>
+        ) : activeSection === "favorites" ? (
+          <section
+            className='bf-showcase bf-showcase--favorites'
+            aria-label='Favorites library'
+          >
+            <div className='bf-showcase__head'>
+              <h2 className='bf-showcase__title'>Favorites Library</h2>
+              <p className='bf-showcase__subtitle'>
+                Hand-picked clips you’ve saved for quick access.
+              </p>
+            </div>
+            {favoritesPageCards.length > 0 ? (
+              <div className='bf-showcase__row'>
+                {favoritesPageCards.map((item) =>
+                  item.type === "reel" ? (
                     <ReelsCard
-                      key={`grid-reel-${item.data.id}`}
+                      key={`fav-reel-${item.data.id}`}
                       video={item.data}
-                      isFavorite={isFav}
+                      isFavorite
                       showDelete={isAdmin && isLibraryVideo(item.data)}
                       onDelete={requestDelete}
                       onPlay={setPlaying}
@@ -1958,26 +2037,73 @@ export default function Library({
                     />
                   ) : (
                     <MCard
-                      key={`grid-vid-${item.data.id}`}
+                      key={`fav-vid-${item.data.id}`}
                       video={item.data}
                       variant='doc'
-                      stats={item.data.stats}
-                      onPlay={setPlaying}
-                      isFavorite={isFav}
                       showDelete={isAdmin && isLibraryVideo(item.data)}
                       onDelete={requestDelete}
+                      onPlay={setPlaying}
+                      isFavorite
                       onToggleFavorite={(videoItem) => {
                         if (typeof toggleFavorite === "function")
                           toggleFavorite(videoItem.id);
                       }}
                       onShare={shareVideo}
+                      stats={item.data.stats}
                     />
-                  );
-                })
-              )}
-            </div>
-          )}
-        </main>
+                  )
+                )}
+              </div>
+            ) : (
+              <div className='bf-showcase__empty'>
+                You haven’t favorited any videos yet.
+              </div>
+            )}
+          </section>
+        ) : (
+          <div id='library-grid' className='bf-grid'>
+            {mixedCards.length === 0 ? (
+              <div className='bf-empty'>No videos found.</div>
+            ) : (
+              mixedCards.map((item) => {
+                const isFav = favorites.includes(item.data.id);
+                return item.type === "reel" ? (
+                  <ReelsCard
+                    key={`grid-reel-${item.data.id}`}
+                    video={item.data}
+                    isFavorite={isFav}
+                    showDelete={isAdmin && isLibraryVideo(item.data)}
+                    onDelete={requestDelete}
+                    onPlay={setPlaying}
+                    onToggleFavorite={(videoItem) => {
+                      if (typeof toggleFavorite === "function")
+                        toggleFavorite(videoItem.id);
+                    }}
+                    onShare={shareVideo}
+                    stats={item.data.stats}
+                  />
+                ) : (
+                  <MCard
+                    key={`grid-vid-${item.data.id}`}
+                    video={item.data}
+                    variant='doc'
+                    stats={item.data.stats}
+                    onPlay={setPlaying}
+                    isFavorite={isFav}
+                    showDelete={isAdmin && isLibraryVideo(item.data)}
+                    onDelete={requestDelete}
+                    onToggleFavorite={(videoItem) => {
+                      if (typeof toggleFavorite === "function")
+                        toggleFavorite(videoItem.id);
+                    }}
+                    onShare={shareVideo}
+                  />
+                );
+              })
+            )}
+          </div>
+        )}
+      </main>
 
       <EditProfileModal
         open={showProfileEdit}
