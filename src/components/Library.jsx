@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Heart, X, Pencil } from "lucide-react";
 import useLibraryStore from "../store/useLibraryStore";
 import useProfileStore from "../store/useProfileStore";
 import useSettingsStore from "../store/useSettingsStore";
 import useAuth from "../store/useAuth";
+import useAdminPanel from "../store/useAdminPanel";
 import MCard from "./MCard.jsx";
 import ReelsCard from "./ReelsCard.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
@@ -14,6 +16,7 @@ const DEFAULT_HOME_WALLPAPER = "/WP1.jpg";
 const DEFAULT_NAME = "Jaytee Thomas";
 const DEFAULT_HOMETOWN = "Nashville, TN";
 const DEFAULT_HANDLE = "@Jay_In_Nashvile";
+const NSFW_CONSENT_KEY = "bf-nsfw-consent";
 
 const YOUTUBE_PATTERNS = [
   /youtu\.be\/([^?&/]+)/i,
@@ -1318,6 +1321,7 @@ export default function Library({
   mode = "library",
   search = "",
 }) {
+  const navigate = useNavigate();
   const {
     videos,
     favorites = [],
@@ -1331,10 +1335,15 @@ export default function Library({
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const saveFallback = useLibraryStore((state) => state.saveFallback);
   const authUser = useAuth((state) => state.user);
+  const authStatus = useAuth((state) => state.status);
+  const openLogin = useAdminPanel((state) => state.openLogin);
+  const openRegister = useAdminPanel((state) => state.openRegister);
   const isAdmin = authUser?.role === "admin";
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [fallbackPending, setFallbackPending] = useState(false);
   const [fallbackSaved, setFallbackSaved] = useState(false);
+  const [nsfwConsent, setNsfwConsent] = useState(false);
+  const [nsfwConsentReady, setNsfwConsentReady] = useState(false);
 
   useEffect(() => {
     if (!profileReady) {
@@ -1342,6 +1351,20 @@ export default function Library({
     }
     loadSettings().catch(() => {});
   }, [profileReady, loadProfile, loadSettings]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setNsfwConsentReady(true);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(NSFW_CONSENT_KEY);
+      setNsfwConsent(stored === "true");
+    } catch (error) {
+      console.warn("Failed to read NSFW consent flag", error);
+    }
+    setNsfwConsentReady(true);
+  }, []);
 
   const enrichReel = useCallback((video, index = 0) => {
     const poster = video.poster || video.thumbnail;
@@ -1697,6 +1720,21 @@ export default function Library({
     },
     [isAdmin, isLibraryVideo]
   );
+
+  const handleNsfwConsent = useCallback(() => {
+    setNsfwConsent(true);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(NSFW_CONSENT_KEY, "true");
+      } catch (error) {
+        console.warn("Failed to persist NSFW consent flag", error);
+      }
+    }
+  }, []);
+
+  const handleNsfwExit = useCallback(() => {
+    navigate("/library", { replace: true });
+  }, [navigate]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -2070,35 +2108,94 @@ export default function Library({
             )}
           </section>
         ) : activeSection === "nsfw" ? (
-          <section className='bf-showcase bf-showcase--nsfw' aria-label='NSFW library'>
-            <div className='bf-showcase__head'>
-              <h2 className='bf-showcase__title'>NSFW Library</h2>
-              <p className='bf-showcase__subtitle'>Content flagged as explicit or adults-only.</p>
-            </div>
-            {nsfwPageCards.length > 0 ? (
-              <div className='bf-showcase__row'>
-                {nsfwPageCards.map((video) => (
-                  <MCard
-                    key={`nsfw-${video.id}`}
-                    video={video}
-                    variant='doc'
-                    stats={video.stats}
-                    showDelete={isAdmin && isLibraryVideo(video)}
-                    onDelete={requestDelete}
-                    onPlay={setPlaying}
-                    isFavorite={favorites.includes(video.id)}
-                    onToggleFavorite={(videoItem) => {
-                      if (typeof toggleFavorite === "function")
-                        toggleFavorite(videoItem.id);
-                    }}
-                    onShare={shareVideo}
-                  />
-                ))}
+          authStatus === "loading" || authStatus === "idle" ? (
+            <section className='bf-nsfwGate' aria-label='Checking permissions'>
+              <div className='bf-nsfwGate__spinner' aria-hidden='true' />
+              <h2 className='bf-nsfwGate__title'>Preparing access…</h2>
+              <p className='bf-nsfwGate__body'>Hang tight while we confirm your permissions.</p>
+            </section>
+          ) : !authUser || authUser.role === "guest" ? (
+            <section className='bf-nsfwGate' aria-label='Restricted NSFW library'>
+              <span className='bf-nsfwGate__eyebrow'>Restricted Library</span>
+              <h2 className='bf-nsfwGate__title'>Sign in to view NSFW content</h2>
+              <p className='bf-nsfwGate__body'>
+                Because this catalog contains explicit scenes, only authenticated members can browse it.
+                Log in with your account to continue.
+              </p>
+              <div className='bf-nsfwGate__buttons'>
+                <button
+                  type='button'
+                  className='bf-nsfwGate__btn bf-nsfwGate__btn--primary'
+                  onClick={openLogin}
+                >
+                  Sign in
+                </button>
+                <button type='button' className='bf-nsfwGate__btn' onClick={openRegister}>
+                  Create account
+                </button>
+                <button type='button' className='bf-nsfwGate__link' onClick={handleNsfwExit}>
+                  Back to library
+                </button>
               </div>
-            ) : (
-              <div className='bf-showcase__empty'>No NSFW videos available.</div>
-            )}
-          </section>
+            </section>
+          ) : !nsfwConsentReady ? (
+            <section className='bf-nsfwGate' aria-label='Preparing NSFW consent'>
+              <div className='bf-nsfwGate__spinner' aria-hidden='true' />
+              <h2 className='bf-nsfwGate__title'>Almost there…</h2>
+              <p className='bf-nsfwGate__body'>Just a moment while we prepare the catalog.</p>
+            </section>
+          ) : nsfwConsent ? (
+            <section className='bf-showcase bf-showcase--nsfw' aria-label='NSFW library'>
+              <div className='bf-showcase__head'>
+                <h2 className='bf-showcase__title'>NSFW Library</h2>
+                <p className='bf-showcase__subtitle'>Content flagged as explicit or adults-only.</p>
+              </div>
+              {nsfwPageCards.length > 0 ? (
+                <div className='bf-showcase__row'>
+                  {nsfwPageCards.map((video) => (
+                    <MCard
+                      key={`nsfw-${video.id}`}
+                      video={video}
+                      variant='doc'
+                      stats={video.stats}
+                      showDelete={isAdmin && isLibraryVideo(video)}
+                      onDelete={requestDelete}
+                      onPlay={setPlaying}
+                      isFavorite={favorites.includes(video.id)}
+                      onToggleFavorite={(videoItem) => {
+                        if (typeof toggleFavorite === "function")
+                          toggleFavorite(videoItem.id);
+                      }}
+                      onShare={shareVideo}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className='bf-showcase__empty'>No NSFW videos available.</div>
+              )}
+            </section>
+          ) : (
+            <section className='bf-nsfwGate' aria-label='NSFW consent confirmation'>
+              <span className='bf-nsfwGate__eyebrow'>Adults Only</span>
+              <h2 className='bf-nsfwGate__title'>Confirm you are 18 or older</h2>
+              <p className='bf-nsfwGate__body'>
+                By entering you certify that you are of legal age in your region and consent to view explicit
+                material. You can revoke this confirmation anytime by clearing your browser storage.
+              </p>
+              <div className='bf-nsfwGate__buttons'>
+                <button
+                  type='button'
+                  className='bf-nsfwGate__btn bf-nsfwGate__btn--primary'
+                  onClick={handleNsfwConsent}
+                >
+                  I’m 18+ — enter
+                </button>
+                <button type='button' className='bf-nsfwGate__btn' onClick={handleNsfwExit}>
+                  No thanks
+                </button>
+              </div>
+            </section>
+          )
         ) : (
           <div id='library-grid' className='bf-grid'>
             {mixedCards.length === 0 ? (

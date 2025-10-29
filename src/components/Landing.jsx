@@ -2,6 +2,9 @@ import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import useSettingsStore from "../store/useSettingsStore";
 import useContentStore from "../store/useContentStore";
+import useAdminPanel from "../store/useAdminPanel";
+import useAuth from "../store/useAuth";
+import { testimonials, clientLogos } from "../data/testimonials";
 
 const FEATURED_SETS = [
   {
@@ -35,6 +38,9 @@ export default function Landing() {
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const content = useContentStore((state) => state.content);
   const loadContent = useContentStore((state) => state.loadContent);
+  const openContentEditor = useAdminPanel((state) => state.openContentEditor);
+  const user = useAuth((state) => state.user);
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     loadSettings().catch(() => {});
@@ -90,6 +96,15 @@ export default function Landing() {
             <Link className='landing__btn landing__btn--primary' to={ctaLink || "/library"}>
               {ctaLabel || "Explore Library"}
             </Link>
+            {isAdmin && (
+              <button
+                type='button'
+                className='landing__editBtn'
+                onClick={openContentEditor}
+              >
+                Edit hero & links
+              </button>
+            )}
           </div>
         </div>
         {showFallbackImage ? null : null}
@@ -115,6 +130,37 @@ export default function Landing() {
           ))}
         </section>
       )}
+
+      <section className='landing__testimonials' aria-label='Testimonials and clients'>
+        <div className='landing__testimonialsHead'>
+          <span className='landing__testimonialsEyebrow'>Trusted Collaborators</span>
+          <h2 className='landing__testimonialsTitle'>Stories that resonate with the people who matter</h2>
+          <p className='landing__testimonialsLead'>
+            From touring artists to civic partners, Beechwood Films brings cinematic craft, technical precision,
+            and agile storytelling to every engagement.
+          </p>
+        </div>
+
+        <div className='landing__testimonialGrid'>
+          {testimonials.map((item) => (
+            <article className='landing__testimonialCard' key={item.name}>
+              <p className='landing__testimonialQuote'>“{item.quote}”</p>
+              <div className='landing__testimonialMeta'>
+                <span className='landing__testimonialName'>{item.name}</span>
+                <span className='landing__testimonialTitle'>{item.title}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div className='landing__clientStrip' aria-label='Client partners'>
+          {clientLogos.map((client) => (
+            <span key={client} className='landing__clientBadge'>
+              {client}
+            </span>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
