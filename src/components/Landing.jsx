@@ -24,8 +24,8 @@ const FEATURED_SETS = [
   },
   {
     id: "set-about",
-    label: "Meet the mind behind Beechwood Films",
-    blurb: "Meet the team behind Beechwood Films.",
+    label: "About",
+    blurb: "Meet the mind behind Beechwood Films.",
     to: "/about",
   },
 ];
@@ -44,7 +44,7 @@ export default function Landing() {
   const eyebrow = content.homeEyebrow?.trim() || "Beechwood Films";
   const title =
     content.homeTitle?.trim() ||
-    "Stories in motion for people, places, and everyday life—spotlighting the sparks that change everything.";
+    "Stories in motion for people, places, and everyday life";
   const lead =
     content.homeLead?.trim() ||
     "Capturing the heartbeat of Nashville and beyond—performances, behind-the-scenes moments, and the people that make them resonate.";
