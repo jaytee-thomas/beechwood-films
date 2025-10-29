@@ -6,6 +6,7 @@ const useAdminPanel = create((set) => ({
   showAuth: false,
   authView: "login",
   showUpload: false,
+  showContentEditor: false,
 
   openLogin: () => set({ showAuth: true, authView: "login" }),
   openRegister: () => set({ showAuth: true, authView: "register" }),
@@ -21,6 +22,15 @@ const useAdminPanel = create((set) => ({
     set({ showUpload: true });
   },
   closeUpload: () => set({ showUpload: false }),
+  openContentEditor: () => {
+    const user = useAuth.getState().user;
+    if (!user || user.role !== "admin") {
+      set({ showAuth: true, authView: "login" });
+      return;
+    }
+    set({ showContentEditor: true });
+  },
+  closeContentEditor: () => set({ showContentEditor: false }),
 }));
 
 export default useAdminPanel;

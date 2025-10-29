@@ -4,9 +4,42 @@ import { useNavigate } from "react-router-dom";
 import useAdminPanel from "../store/useAdminPanel";
 import useLibraryStore from "../store/useLibraryStore";
 import useAuth from "../store/useAuth";
+import useContentStore from "../store/useContentStore";
 
 const API_BASE =
   import.meta.env.VITE_API_URL || "http://localhost:4000";
+
+const QUICK_LINK_FIELDS = [
+  {
+    labelKey: "homeQuickLinkOneLabel",
+    hrefKey: "homeQuickLinkOneHref",
+    title: "Quick Link 1"
+  },
+  {
+    labelKey: "homeQuickLinkTwoLabel",
+    hrefKey: "homeQuickLinkTwoHref",
+    title: "Quick Link 2"
+  },
+  {
+    labelKey: "homeQuickLinkThreeLabel",
+    hrefKey: "homeQuickLinkThreeHref",
+    title: "Quick Link 3"
+  }
+];
+
+const createContentDraft = (content = {}) => ({
+  homeEyebrow: content.homeEyebrow || "",
+  homeTitle: content.homeTitle || "",
+  homeLead: content.homeLead || "",
+  homeCtaLabel: content.homeCtaLabel || "",
+  homeCtaLink: content.homeCtaLink || "",
+  homeQuickLinkOneLabel: content.homeQuickLinkOneLabel || "",
+  homeQuickLinkOneHref: content.homeQuickLinkOneHref || "",
+  homeQuickLinkTwoLabel: content.homeQuickLinkTwoLabel || "",
+  homeQuickLinkTwoHref: content.homeQuickLinkTwoHref || "",
+  homeQuickLinkThreeLabel: content.homeQuickLinkThreeLabel || "",
+  homeQuickLinkThreeHref: content.homeQuickLinkThreeHref || ""
+});
 
 export function AuthModal({ open, view, onClose, onSwitch }) {
   const [animateIn, setAnimateIn] = useState(false);
@@ -641,6 +674,374 @@ function UploadModal({ open, onClose, onAdd }) {
   ) : null;
 }
 
+function ContentEditorModal({ open, onClose }) {
+  const content = useContentStore((state) => state.content);
+  const loadContent = useContentStore((state) => state.loadContent);
+  const saveContent = useContentStore((state) => state.saveContent);
+  const saving = useContentStore((state) => state.saving);
+  const storeError = useContentStore((state) => state.error);
+  const [draft, setDraft] = useState(() => createContentDraft(content));
+  const [localError, setLocalError] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    setDirty(false);
+    setLocalError("");
+    setDraft(createContentDraft(useContentStore.getState().content));
+    loadContent().catch(() => {});
+    return undefined;
+  }, [open, loadContent]);
+
+  useEffect(() => {
+    if (!open || dirty) return undefined;
+    setDraft(createContentDraft(content));
+    return undefined;
+  }, [open, dirty, content]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const activeError = localError || storeError;
+
+  const handleChange = (key) => (event) => {
+    const value = event.target.value;
+    setDirty(true);
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLocalError("");
+    const payload = {};
+    for (const [key, value] of Object.entries(draft)) {
+      payload[key] = typeof value === "string" ? value.trim() : value;
+    }
+    try {
+      await saveContent(payload);
+      setDirty(false);
+      onClose();
+    } catch (error) {
+      setLocalError(error.message || "Could not save content");
+    }
+  };
+
+  const handleReset = () => {
+    setDraft(createContentDraft(content));
+    setLocalError("");
+    setDirty(false);
+  };
+
+  const S = {
+    overlay: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.55)",
+      zIndex: 3100
+    },
+    panel: {
+      position: "fixed",
+      inset: "4vh 0",
+      margin: "0 auto",
+      width: "min(680px, 94vw)",
+      maxHeight: "92vh",
+      background: "#11121a",
+      borderRadius: 14,
+      border: "1px solid #2f3240",
+      boxShadow: "0 24px 60px rgba(0,0,0,.55)",
+      padding: 22,
+      display: "flex",
+      flexDirection: "column",
+      color: "#f4f5ff",
+      zIndex: 3101
+    },
+    header: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 12
+    },
+    title: { margin: 0, fontSize: "1.12rem", fontWeight: 700 },
+    iconBtn: {
+      appearance: "none",
+      border: "1px solid #2f3240",
+      background: "#191b22",
+      color: "#f4f5ff",
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer"
+    },
+    form: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
+      height: "100%"
+    },
+    body: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 20,
+      overflowY: "auto",
+      paddingRight: 2,
+      marginRight: -2
+    },
+    section: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      background: "#16171f",
+      borderRadius: 12,
+      border: "1px solid rgba(255,255,255,0.06)",
+      padding: 18
+    },
+    sectionLabel: {
+      textTransform: "uppercase",
+      letterSpacing: ".08em",
+      fontSize: ".76rem",
+      color: "#a4a9bd",
+      fontWeight: 600
+    },
+    helper: {
+      fontSize: ".84rem",
+      color: "#8f94a7",
+      marginTop: -4
+    },
+    label: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    },
+    input: {
+      background: "#1a1c24",
+      border: "1px solid #303345",
+      borderRadius: 8,
+      color: "#f4f5ff",
+      padding: "10px 12px",
+      fontSize: ".95rem",
+      outline: "none"
+    },
+    textarea: {
+      background: "#1a1c24",
+      border: "1px solid #303345",
+      borderRadius: 8,
+      color: "#f4f5ff",
+      padding: "10px 12px",
+      minHeight: 100,
+      resize: "vertical",
+      fontSize: ".95rem",
+      outline: "none"
+    },
+    quickGrid: {
+      display: "grid",
+      gap: 14,
+      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))"
+    },
+    quickCard: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      background: "#1b1d27",
+      borderRadius: 10,
+      border: "1px solid rgba(255,255,255,0.05)",
+      padding: 12
+    },
+    smallLabel: {
+      fontSize: ".8rem",
+      color: "#9aa1b7",
+      fontWeight: 600
+    },
+    error: {
+      background: "rgba(240, 74, 111, 0.14)",
+      border: "1px solid rgba(240, 74, 111, 0.4)",
+      color: "#ff9ab6",
+      borderRadius: 10,
+      padding: "10px 12px",
+      fontSize: ".9rem"
+    },
+    footer: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 10
+    },
+    btn: {
+      padding: "8px 14px",
+      borderRadius: 8,
+      border: "1px solid #31354a",
+      background: "#1e202a",
+      color: "#f4f5ff",
+      cursor: "pointer",
+      fontWeight: 600
+    },
+    primary: {
+      background: "var(--accent-gradient)",
+      borderColor: "var(--accent-border)",
+      boxShadow: "0 0 18px var(--accent-glow)"
+    }
+  };
+
+  return (
+    <>
+      <div style={S.overlay} onClick={onClose} />
+      <div
+        style={S.panel}
+        role='dialog'
+        aria-modal='true'
+        aria-labelledby='bf-contentEditor-title'
+      >
+        <header style={S.header}>
+          <h3 id='bf-contentEditor-title' style={S.title}>
+            Landing content
+          </h3>
+          <button
+            type='button'
+            style={S.iconBtn}
+            onClick={onClose}
+            aria-label='Close landing content editor'
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <form style={S.form} onSubmit={handleSubmit}>
+          <div style={S.body}>
+            <section style={S.section} aria-label='Hero copy'>
+              <span style={S.sectionLabel}>Hero Copy</span>
+              <span style={S.helper}>
+                Leave a field blank to fall back to the default site copy.
+              </span>
+              <label style={S.label}>
+                Eyebrow
+                <input
+                  style={S.input}
+                  value={draft.homeEyebrow}
+                  onChange={handleChange("homeEyebrow")}
+                  placeholder='Beechwood Films'
+                  maxLength={80}
+                />
+              </label>
+              <label style={S.label}>
+                Title
+                <input
+                  style={S.input}
+                  value={draft.homeTitle}
+                  onChange={handleChange("homeTitle")}
+                  placeholder='Stories in motion for...'
+                  maxLength={160}
+                />
+              </label>
+              <label style={S.label}>
+                Lead paragraph
+                <textarea
+                  style={S.textarea}
+                  value={draft.homeLead}
+                  onChange={handleChange("homeLead")}
+                  placeholder='Capturing the heartbeat of...'
+                  maxLength={500}
+                />
+              </label>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+                <label style={S.label}>
+                  Primary button label
+                  <input
+                    style={S.input}
+                    value={draft.homeCtaLabel}
+                    onChange={handleChange("homeCtaLabel")}
+                    placeholder='Explore Library'
+                    maxLength={60}
+                  />
+                </label>
+                <label style={S.label}>
+                  Primary button link
+                  <input
+                    style={S.input}
+                    value={draft.homeCtaLink}
+                    onChange={handleChange("homeCtaLink")}
+                    placeholder='/library'
+                    maxLength={120}
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section style={S.section} aria-label='Quick links'>
+              <span style={S.sectionLabel}>Quick Links</span>
+              <span style={S.helper}>
+                Leave the label empty to hide a card. Use full URLs or internal paths.
+              </span>
+              <div style={S.quickGrid}>
+                {QUICK_LINK_FIELDS.map((field) => (
+                  <div key={field.labelKey} style={S.quickCard}>
+                    <span style={S.smallLabel}>{field.title}</span>
+                    <label style={S.label}>
+                      Label
+                      <input
+                        style={S.input}
+                        value={draft[field.labelKey]}
+                        onChange={handleChange(field.labelKey)}
+                        placeholder='Videos'
+                        maxLength={80}
+                      />
+                    </label>
+                    <label style={S.label}>
+                      Link
+                      <input
+                        style={S.input}
+                        value={draft[field.hrefKey]}
+                        onChange={handleChange(field.hrefKey)}
+                        placeholder='/vids'
+                        maxLength={160}
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          {activeError ? <div style={S.error}>{activeError}</div> : null}
+
+          <div style={S.footer}>
+            <button
+              type='button'
+              style={S.btn}
+              onClick={handleReset}
+              disabled={saving}
+            >
+              Revert
+            </button>
+            <button type='button' style={S.btn} onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type='submit'
+              style={{ ...S.btn, ...S.primary, opacity: saving ? 0.7 : 1 }}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </>
+  );
+}
+
 export default function AdminPortals() {
   const navigate = useNavigate();
   const { addVideo } = useLibraryStore();
@@ -651,14 +1052,19 @@ export default function AdminPortals() {
     setAuthView,
     showUpload,
     closeUpload,
+    showContentEditor,
+    closeContentEditor
   } = useAdminPanel();
   const { user } = useAuth();
 
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
-    if (!isAdmin) closeUpload();
-  }, [isAdmin, closeUpload]);
+    if (!isAdmin) {
+      closeUpload();
+      closeContentEditor();
+    }
+  }, [isAdmin, closeUpload, closeContentEditor]);
 
   return (
     <>
@@ -679,6 +1085,7 @@ export default function AdminPortals() {
           return created;
         }}
       />
+      <ContentEditorModal open={isAdmin && showContentEditor} onClose={closeContentEditor} />
     </>
   );
 }
