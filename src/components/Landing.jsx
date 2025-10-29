@@ -18,13 +18,13 @@ const FEATURED_SETS = [
   },
   {
     id: "set-nsfw",
-    label: "NSFW",
-    blurb: "Explicit or adults-only catalog (requires login).",
+    label: "NSFW Classified",
+    blurb: "Explicit, classified, or adults-only catalog (requires login).",
     to: "/nsfw",
   },
   {
     id: "set-about",
-    label: "About",
+    label: "Meet the mind behind Beechwood Films",
     blurb: "Meet the team behind Beechwood Films.",
     to: "/about",
   },
@@ -42,10 +42,12 @@ export default function Landing() {
   }, [loadSettings, loadContent]);
 
   const eyebrow = content.homeEyebrow?.trim() || "Beechwood Films";
-  const title = content.homeTitle?.trim() || "Stories in motion for artists, venues, and dreamers.";
+  const title =
+    content.homeTitle?.trim() ||
+    "Stories in motion for people, places, and everyday life—spotlighting the sparks that change everything.";
   const lead =
     content.homeLead?.trim() ||
-    "We capture the heartbeat of Nashville and beyond—performances, behind-the-scenes moments, and the people that make them resonate.";
+    "Capturing the heartbeat of Nashville and beyond—performances, behind-the-scenes moments, and the people that make them resonate.";
   const ctaLabel = content.homeCtaLabel?.trim() || "Explore Library";
   const ctaLink = content.homeCtaLink?.trim() || "/library";
 
