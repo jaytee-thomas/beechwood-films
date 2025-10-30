@@ -17,7 +17,7 @@ const baseProfile = Object.freeze({
   name: "",
   bio: "",
   hometown: "",
-  photo: "",
+  photo: "/IMG_2669.JPG",
   wallpaper: "",
   phone: "",
   email: "",
