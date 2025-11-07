@@ -18,6 +18,7 @@ import {
   updateUserPreferences,
   ensureAdminUser
 } from "../db/users.js";
+import { migrate } from "../db/migrate.js";
 
 const router = Router();
 
@@ -34,6 +35,7 @@ const dbg = (...args) => {
 
 // --- seed admin using HASH (not plaintext) ---
 const ensureAdminSeed = async () => {
+  await migrate();
   const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
   const adminHash = process.env.ADMIN_PASSWORD_HASH; // already bcrypt
   if (!adminEmail || !adminHash) {
@@ -59,7 +61,7 @@ router.post("/register", async (req, res, next) => {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const existing = getUserByEmail(emailNorm);
+    const existing = await getUserByEmail(emailNorm);
     if (existing) {
       return res.status(409).json({ error: "Email already registered" });
     }
@@ -67,7 +69,7 @@ router.post("/register", async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, 12);
     const role = emailNorm === normalizeEmail(process.env.ADMIN_EMAIL) ? "admin" : "user";
 
-    const user = createUser({
+    const user = await createUser({
       email: emailNorm,                // store normalized
       passwordHash,
       name,
@@ -94,7 +96,7 @@ router.post("/login", async (req, res, next) => {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const user = getUserByEmail(emailNorm);
+    const user = await getUserByEmail(emailNorm);
     if (!user) {
       dbg("no such user", emailNorm);
       return res.status(401).json({ error: "Invalid credentials" });
@@ -173,7 +175,7 @@ router.patch("/me/preferences", requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: "notifyOnNewVideo must be boolean" });
     }
 
-    const updatedUser = updateUserPreferences(user.id, { notifyOnNewVideo });
+    const updatedUser = await updateUserPreferences(user.id, { notifyOnNewVideo });
     const session = createSession(updatedUser);
 
     const token = extractToken(req);

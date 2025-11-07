@@ -1,5 +1,9 @@
 import crypto from "crypto";
-import db from "./client.js";
+import { query } from "./pool.js";
+
+const normalizeEmail = (value) => (value || "").trim().toLowerCase();
+const toTimestamp = (value) =>
+  value === null || value === undefined ? null : Number(value);
 
 const toUser = (row) => {
   if (!row) return null;
@@ -10,94 +14,112 @@ const toUser = (row) => {
     name: row.name,
     role: row.role,
     notifyOnNewVideo: Boolean(row.notify_on_new_video),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    createdAt: toTimestamp(row.created_at),
+    updatedAt: toTimestamp(row.updated_at)
   };
 };
 
-export const getUserByEmail = (email) => {
-  const row = db
-    .prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE")
-    .get(email);
-  return toUser(row);
+export const getUserByEmail = async (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+  const { rows } = await query(
+    `SELECT id, email, password, name, role, notify_on_new_video, created_at, updated_at
+       FROM users
+      WHERE lower(email) = $1
+      LIMIT 1`,
+    [normalizedEmail]
+  );
+  return toUser(rows[0]);
 };
 
-export const getUserById = (id) => {
-  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
-  return toUser(row);
+export const getUserById = async (id) => {
+  if (!id) return null;
+  const { rows } = await query(
+    `SELECT id, email, password, name, role, notify_on_new_video, created_at, updated_at
+       FROM users
+      WHERE id = $1
+      LIMIT 1`,
+    [id]
+  );
+  return toUser(rows[0]);
 };
 
-export const createUser = ({
+export const createUser = async ({
   email,
   passwordHash,
   name,
   role = "user",
   notifyOnNewVideo = true
 }) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    throw new Error("Email is required to create a user");
+  }
   const now = Date.now();
   const id = crypto.randomUUID();
-  db.prepare(
+  const { rows } = await query(
     `INSERT INTO users (
-      id, email, password, name, role, notify_on_new_video, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    email.toLowerCase(),
-    passwordHash,
-    name ?? email.split("@")[0],
-    role,
-    notifyOnNewVideo ? 1 : 0,
-    now,
-    now
+       id, email, password, name, role, notify_on_new_video, created_at, updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+     RETURNING id, email, password, name, role, notify_on_new_video, created_at, updated_at`,
+    [
+      id,
+      normalizedEmail,
+      passwordHash,
+      name ?? normalizedEmail.split("@")[0],
+      role,
+      Boolean(notifyOnNewVideo),
+      now
+    ]
   );
 
-  return getUserById(id);
+  return toUser(rows[0]);
 };
 
-export const updateUserPreferences = (id, { notifyOnNewVideo }) => {
+export const updateUserPreferences = async (id, { notifyOnNewVideo }) => {
+  if (!id) return null;
   const now = Date.now();
-  db.prepare(
+  const { rows } = await query(
     `UPDATE users
-     SET notify_on_new_video = ?, updated_at = ?
-     WHERE id = ?`
-  ).run(notifyOnNewVideo ? 1 : 0, now, id);
-
-  return getUserById(id);
+        SET notify_on_new_video = $1,
+            updated_at = $2
+      WHERE id = $3
+      RETURNING id, email, password, name, role, notify_on_new_video, created_at, updated_at`,
+    [Boolean(notifyOnNewVideo), now, id]
+  );
+  return toUser(rows[0]);
 };
 
 export const ensureAdminUser = async ({ email, passwordHash }) => {
-  const existing = getUserByEmail(email);
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return;
   const now = Date.now();
+  const existing = await getUserByEmail(normalizedEmail);
   if (existing) {
-    db.prepare(
+    await query(
       `UPDATE users
-         SET role = 'admin',
-             password = ?,
-             updated_at = ?
-       WHERE id = ?`
-    ).run(passwordHash || existing.password, now, existing.id);
+          SET role = 'admin',
+              password = $1,
+              updated_at = $2
+        WHERE id = $3`,
+      [passwordHash || existing.password, now, existing.id]
+    );
     return;
   }
 
-  const id = crypto.randomUUID();
-  db.prepare(
+  await query(
     `INSERT INTO users (
-      id, email, password, name, role, notify_on_new_video, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 'admin', 0, ?, ?)`
-  ).run(id, email.toLowerCase(), passwordHash, "Admin", now, now);
+       id, email, password, name, role, notify_on_new_video, created_at, updated_at
+     ) VALUES ($1, $2, $3, 'Admin', 'admin', FALSE, $4, $4)`,
+    [crypto.randomUUID(), normalizedEmail, passwordHash, now]
+  );
 };
 
-export const listUsersToNotify = () => {
-  const rows = db
-    .prepare(
-      `SELECT id, email, name
+export const listUsersToNotify = async () => {
+  const { rows } = await query(
+    `SELECT id, email, name
        FROM users
-       WHERE notify_on_new_video = 1 AND email IS NOT NULL`
-    )
-    .all();
-  return rows.map((row) => ({
-    id: row.id,
-    email: row.email,
-    name: row.name
-  }));
+      WHERE notify_on_new_video IS TRUE AND email IS NOT NULL`
+  );
+  return rows;
 };

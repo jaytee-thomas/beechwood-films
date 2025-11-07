@@ -67,7 +67,7 @@ const sendResendEmail = async (recipients, video) => {
  * For now we log to the server console so you can wire a real provider later.
  */
 export const notifyUsersOfNewVideo = async (video) => {
-  const recipients = listUsersToNotify();
+  const recipients = await listUsersToNotify();
 
   if (!recipients.length) return;
 

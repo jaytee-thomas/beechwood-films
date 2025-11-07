@@ -11,6 +11,7 @@ import profileRouter from "./routes/profile.js";
 import settingsRouter from "./routes/settings.js";
 import contentRouter from "./routes/content.js";
 import { initializeDatabase } from "./db/setup.js";
+import { migrate } from "./db/migrate.js";
 
 dotenv.config();
 
@@ -84,6 +85,7 @@ app.use((err, req, res, _next) => {
 });
 
 const start = async () => {
+  await migrate();
   initializeDatabase();
   app.listen(port, () => {
     console.log(`API server listening on port ${port}`);
