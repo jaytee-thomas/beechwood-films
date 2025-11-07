@@ -21,48 +21,56 @@ import {
 
 const router = Router();
 
+// --- helpers ---
+const normalizeEmail = (e) => (e || "").trim().toLowerCase();
 const sanitizeUser = (user) => {
   if (!user) return null;
   const { password: _password, ...rest } = user;
   return rest;
 };
+const dbg = (...args) => {
+  if (process.env.DEBUG_AUTH === "1") console.log("[auth]", ...args);
+};
 
+// --- seed admin using HASH (not plaintext) ---
 const ensureAdminSeed = async () => {
-  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminEmail || !adminPassword) {
+  const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+  const adminHash = process.env.ADMIN_PASSWORD_HASH; // already bcrypt
+  if (!adminEmail || !adminHash) {
+    console.warn("[auth] Admin seed skipped: missing ADMIN_EMAIL or ADMIN_PASSWORD_HASH");
     return;
   }
-  const passwordHash = await bcrypt.hash(adminPassword, 12);
-  await ensureAdminUser({ email: adminEmail, passwordHash });
+  // Do NOT re-hash adminHash
+  await ensureAdminUser({ email: adminEmail, passwordHash: adminHash });
 };
 
 ensureAdminSeed().catch((err) => {
-  console.error("Failed to ensure admin account", err);
+  console.error("[auth] Failed to ensure admin account", err);
 });
 
+// --- routes ---
 router.post("/register", async (req, res, next) => {
   try {
     const { email, password, name, subscribe = true } = req.body || {};
-    if (!email || !password) {
+    const emailNorm = normalizeEmail(email);
+
+    if (!emailNorm || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const existing = getUserByEmail(email);
+    const existing = getUserByEmail(emailNorm);
     if (existing) {
       return res.status(409).json({ error: "Email already registered" });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const role =
-      email.toLowerCase() === (process.env.ADMIN_EMAIL || "").toLowerCase()
-        ? "admin"
-        : "user";
+    const role = emailNorm === normalizeEmail(process.env.ADMIN_EMAIL) ? "admin" : "user";
+
     const user = createUser({
-      email,
+      email: emailNorm,                // store normalized
       passwordHash,
       name,
-      notifyOnNewVideo: subscribe,
+      notifyOnNewVideo: !!subscribe,
       role
     });
 
@@ -80,16 +88,19 @@ router.post("/register", async (req, res, next) => {
 router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) {
+    const emailNorm = normalizeEmail(email);
+    if (!emailNorm || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const user = getUserByEmail(email);
+    const user = getUserByEmail(emailNorm);
     if (!user) {
+      dbg("no such user", emailNorm);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const isValid = await bcrypt.compare(password, user.password);
+    dbg("compare", { emailMatch: true, hashLen: (user.password || "").length, ok: isValid });
     if (!isValid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -162,10 +173,10 @@ router.patch("/me/preferences", requireAuth, async (req, res, next) => {
     }
 
     const updatedUser = updateUserPreferences(user.id, { notifyOnNewVideo });
-
     const session = createSession(updatedUser);
+
     const token = extractToken(req);
-    if (token) deleteSession(token);
+    if (token) deleteSession(token); // rotate
 
     return res.json({
       token: session.token,
