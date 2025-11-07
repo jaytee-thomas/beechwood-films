@@ -35,3 +35,6 @@ node_modules/
 dist/
 *.DS_Store
 admin.txt
+
+# local sqlite leftovers
+server/data/*.db*
