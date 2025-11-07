@@ -42,6 +42,7 @@ const ensureAdminSeed = async () => {
   }
   // Do NOT re-hash adminHash
   await ensureAdminUser({ email: adminEmail, passwordHash: adminHash });
+  console.log("[auth] seeded admin:", { email: adminEmail, hashLen: adminHash.length });
 };
 
 ensureAdminSeed().catch((err) => {
