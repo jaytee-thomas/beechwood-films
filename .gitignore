@@ -27,3 +27,10 @@ dist-ssr
 .env
 .env.*
 .env
+.env
+.env.local
+.env.localbackup
+admin.txt
+node_modules/
+dist/
+*.DS_Store
