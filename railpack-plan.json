@@ -1,0 +1,11 @@
+{
+  "build": {
+    "steps": [
+      { "cmd": "npm ci" },
+      { "cmd": "echo 'skipping extra build step'" }
+    ]
+  },
+  "deploy": {
+    "cmd": "npm run start"
+  }
+}
