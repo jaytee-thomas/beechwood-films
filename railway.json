@@ -1,0 +1,6 @@
+{
+  "build": {
+    "installCommand": "npm install --omit=dev",
+    "buildCommand": "npm run start"
+  }
+}
