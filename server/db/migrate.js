@@ -1,7 +1,8 @@
 import { withTransaction } from "./pool.js";
 
+// ===== BASE MIGRATIONS =====
 const statements = [
-  // === USERS TABLE ===
+  // Users table
   `CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     email TEXT NOT NULL,
@@ -12,48 +13,50 @@ const statements = [
     created_at BIGINT NOT NULL,
     updated_at BIGINT NOT NULL
   )`,
-
   `CREATE UNIQUE INDEX IF NOT EXISTS users_email_ci_idx
      ON users ((lower(email)))`,
-
   `CREATE INDEX IF NOT EXISTS users_notify_idx
      ON users (notify_on_new_video)
-     WHERE notify_on_new_video IS TRUE`
+     WHERE notify_on_new_video IS TRUE`,
+
+  // Videos table (base structure)
+  `CREATE TABLE IF NOT EXISTS videos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    s3_key TEXT,
+    thumbnail_url TEXT,
+    duration_seconds INT,
+    published BOOLEAN DEFAULT FALSE,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+  )`
 ];
+
+// ===== P1 EXTENSIONS (R2 + metadata) =====
+statements.push(
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS file_name TEXT`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS size_bytes BIGINT`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS width INT`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS height INT`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'custom'`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS r2_key TEXT`
+);
 
 let migrationPromise = null;
 
+// ===== MIGRATION EXECUTION =====
 const runMigrations = async () => {
   await withTransaction(async (client) => {
-    // === USERS TABLE MIGRATIONS ===
     for (const statement of statements) {
       await client.query(statement);
     }
-
-    // === VIDEOS TABLE MIGRATIONS ===
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS videos (
-        id UUID PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT,
-        s3_key TEXT UNIQUE,
-        thumbnail_url TEXT,
-        duration_seconds INTEGER,
-        published BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at BIGINT NOT NULL,
-        updated_at BIGINT NOT NULL
-      );
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_videos_published_created
-      ON videos (published, created_at DESC);
-    `);
   });
-
   console.log("[pg] migrations applied");
 };
 
+// ===== EXPORT =====
 export const migrate = async () => {
   if (!migrationPromise) {
     migrationPromise = runMigrations().catch((error) => {
