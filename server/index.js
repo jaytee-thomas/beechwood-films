@@ -8,7 +8,6 @@ import videosRouter from "./routes/videos.js";
 import favoritesRouter from "./routes/favorites.js";
 import uploadsRouter from "./routes/uploads.js";
 import profileRouter from "./routes/profile.js";
-//import settingsRouter from "./routes/settings.js";
 import contentRouter from "./routes/content.js";
 import { migrate } from "./db/migrate.js";
 
@@ -54,7 +53,6 @@ app.use("/api/videos", videosRouter);
 app.use("/api/favorites", favoritesRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/profile", profileRouter);
-//app.use("/api/settings", settingsRouter);
 app.use("/api/content", contentRouter);
 
 if (isProduction) {
@@ -83,19 +81,30 @@ app.use((err, req, res, _next) => {
   res.status(status).json(payload);
 });
 
+// --- robust migrate resolver (works for named or default export) ---
+import * as _m from "./db/migrate.js";
+const migrateFn = _m?.migrate ?? _m?.default;
+if (typeof migrateFn !== "function") {
+  throw new Error(
+    "[bootstrap] Could not resolve migrate() from ./db/migrate.js (exported keys: " +
+      Object.keys(_m).join(", ") +
+      ")"
+  );
+}
+
+// IMPORTANT: make sure you removed any old SQLite init like initializeDatabase()
+
 const start = async () => {
-  try {
-    await migrate(); // Runs Postgres migrations and seeds admin
-    app.listen(port, () => {
-      console.log(`✅ API server listening on port ${port}`);
-    });
-  } catch (err) {
-    console.error("❌ Failed to start server:", err);
-    process.exit(1);
-  }
+  // run Postgres migrations before starting the server
+  await migrateFn();
+
+  app.listen(port, () => {
+    console.log(`API server listening on port ${port}`);
+  });
 };
 
 start().catch((err) => {
   console.error("Failed to start API server", err);
   process.exit(1);
 });
+
