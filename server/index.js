@@ -1,3 +1,4 @@
+// server/index.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -5,19 +6,26 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import authRouter from "./routes/auth.js";
-import videosRouter from "./routes/videos.js"; // <— mount this
+import videosRouter from "./routes/videos.js";
+import { attachAuth } from "./middleware/attachAuth.js";
 
 dotenv.config();
 
+/* ------------------------------- setup ------------------------------- */
+
 const app = express();
 const port = Number(process.env.PORT || 4000);
+const clientOrigins = (
+  process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(",") : []
+)
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const isProduction = process.env.NODE_ENV === "production";
 
-// ----- CORS -----
-const clientOrigins =
-  (process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(",") : [])
-    .map(o => o.trim())
-    .filter(Boolean);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distDir = path.resolve(__dirname, "../dist");
 
 if (!clientOrigins.length && !isProduction) {
   clientOrigins.push("http://localhost:5173");
@@ -26,28 +34,31 @@ if (!clientOrigins.length && !isProduction) {
 app.use(
   cors({
     origin: clientOrigins.length ? clientOrigins : "*",
-    credentials: true,
+    credentials: true
   })
 );
 
-// ----- Body parsing -----
 app.use(express.json({ limit: process.env.BODY_LIMIT || "10mb" }));
-app.use(express.urlencoded({ limit: process.env.BODY_LIMIT || "10mb", extended: true }));
+app.use(express.urlencoded({ extended: true }));
 
-// ----- Health -----
-app.get("/health", (_req, res) => {
+/* ----------------------------- healthcheck ---------------------------- */
+
+app.get("/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
-// ----- API routes -----
+/* ------------------------------ routes ------------------------------- */
+
+// attach auth context globally before API routes
+app.use("/api", attachAuth);
+
+// auth routes
 app.use("/api/auth", authRouter);
-app.use("/api/videos", videosRouter); // <— mounted here
 
-// ----- Static SPA for prod -----
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distDir = path.resolve(__dirname, "../dist");
+// videos routes (requireAdmin now has access to req.auth)
+app.use("/api/videos", videosRouter);
 
+// static serve for prod
 if (isProduction) {
   app.use(express.static(distDir));
 
@@ -61,12 +72,14 @@ if (isProduction) {
   });
 }
 
-// ----- Global error handler -----
-app.use((err, _req, res, _next) => {
+/* ---------------------------- error handler --------------------------- */
+
+app.use((err, req, res, _next) => {
   console.error(err);
   const status = Number(err.status || err.statusCode) || 500;
   const payload = {
-    error: status === 500 ? "Something went wrong" : err.message || "Request failed",
+    error:
+      status === 500 ? "Something went wrong" : err.message || "Request failed"
   };
   if (!isProduction && err?.stack) {
     payload.details = err.message;
@@ -75,7 +88,8 @@ app.use((err, _req, res, _next) => {
   res.status(status).json(payload);
 });
 
-// ----- Migrations bootstrap -----
+/* ----------------------------- migrations ----------------------------- */
+
 import * as _m from "./db/migrate.js";
 const migrate = _m?.migrate ?? _m?.default;
 if (typeof migrate !== "function") {
@@ -86,8 +100,10 @@ if (typeof migrate !== "function") {
   );
 }
 
+/* ------------------------------- start ------------------------------- */
+
 const start = async () => {
-  await migrate(); // ensure tables (users + videos) exist before binding port
+  await migrate(); // ensure tables exist before starting server
   app.listen(port, () => {
     console.log(`✅ API server listening on port ${port}`);
   });
