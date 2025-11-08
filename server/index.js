@@ -3,13 +3,16 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import authRouter from "./routes/auth.js";
-//import videosRouter from "./routes/videos.js";
-import favoritesRouter from "./routes/favorites.js";
-import uploadsRouter from "./routes/uploads.js";
-import profileRouter from "./routes/profile.js";
-import contentRouter from "./routes/content.js";
-import { migrate } from "./db/migrate.js";
+
+// TEMP: disable other routes until migrated to Postgres
+// import videosRouter from "./routes/videos.js";
+// import favoritesRouter from "./routes/favorites.js";
+// import uploadsRouter from "./routes/uploads.js";
+// import profileRouter from "./routes/profile.js";
+// import settingsRouter from "./routes/settings.js";
+// import contentRouter from "./routes/content.js";
 
 dotenv.config();
 
@@ -26,35 +29,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distDir = path.resolve(__dirname, "../dist");
 
-if (!clientOrigins.length && process.env.NODE_ENV !== "production") {
+if (!clientOrigins.length && !isProduction) {
   clientOrigins.push("http://localhost:5173");
 }
 
-if (clientOrigins.length) {
-  app.use(
-    cors({
-      origin: clientOrigins,
-      credentials: true
-    })
-  );
-} else {
-  app.use(cors());
-}
+app.use(
+  cors({
+    origin: clientOrigins.length ? clientOrigins : "*",
+    credentials: true
+  })
+);
 
 app.use(express.json({ limit: process.env.BODY_LIMIT || "10mb" }));
-app.use(express.urlencoded({ limit: process.env.BODY_LIMIT || "10mb", extended: true }));
+app.use(express.urlencoded({ extended: true }));
 
+// Health check route
 app.get("/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
+// Auth routes only (for now)
 app.use("/api/auth", authRouter);
-//app.use("/api/videos", videosRouter);
-app.use("/api/favorites", favoritesRouter);
-app.use("/api/uploads", uploadsRouter);
-app.use("/api/profile", profileRouter);
-app.use("/api/content", contentRouter);
 
+// Static serving for production
 if (isProduction) {
   app.use(express.static(distDir));
 
@@ -68,13 +65,14 @@ if (isProduction) {
   });
 }
 
+// Global error handler
 app.use((err, req, res, _next) => {
   console.error(err);
   const status = Number(err.status || err.statusCode) || 500;
   const payload = {
     error: status === 500 ? "Something went wrong" : err.message || "Request failed"
   };
-  if (process.env.NODE_ENV !== "production" && err?.stack) {
+  if (!isProduction && err?.stack) {
     payload.details = err.message;
     payload.stack = err.stack;
   }
@@ -83,8 +81,8 @@ app.use((err, req, res, _next) => {
 
 // --- robust migrate resolver (works for named or default export) ---
 import * as _m from "./db/migrate.js";
-const migrateFn = _m?.migrate ?? _m?.default;
-if (typeof migrateFn !== "function") {
+const migrate = _m?.migrate ?? _m?.default;
+if (typeof migrate !== "function") {
   throw new Error(
     "[bootstrap] Could not resolve migrate() from ./db/migrate.js (exported keys: " +
       Object.keys(_m).join(", ") +
@@ -92,19 +90,15 @@ if (typeof migrateFn !== "function") {
   );
 }
 
-// IMPORTANT: make sure you removed any old SQLite init like initializeDatabase()
-
+// ====== BOOT AFTER MIGRATIONS ======
 const start = async () => {
-  // run Postgres migrations before starting the server
-  await migrateFn();
-
+  await migrate(); // ensure tables exist
   app.listen(port, () => {
-    console.log(`API server listening on port ${port}`);
+    console.log(`✅ API server listening on port ${port}`);
   });
 };
 
 start().catch((err) => {
-  console.error("Failed to start API server", err);
+  console.error("❌ Failed to start API server", err);
   process.exit(1);
 });
-
