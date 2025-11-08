@@ -1,8 +1,7 @@
 {
-  "rewrites": [
-    {
-      "source": "/((?!assets/|favicon\\.ico|robots\\.txt|manifest\\.json).*)",
-      "destination": "/index.html"
-    }
-  ]
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "outputDirectory": "dist",
+  "ignoreCommand": "echo 'ignore server folder'",
+  "framework": "vite"
 }

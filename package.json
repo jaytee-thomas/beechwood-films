@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "server": "node server/index.js",
-    "build": "echo 'skipping extra build step'",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
