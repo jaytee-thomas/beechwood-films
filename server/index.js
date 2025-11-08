@@ -10,7 +10,6 @@ import uploadsRouter from "./routes/uploads.js";
 import profileRouter from "./routes/profile.js";
 import settingsRouter from "./routes/settings.js";
 import contentRouter from "./routes/content.js";
-import { initializeDatabase } from "./db/setup.js";
 import { migrate } from "./db/migrate.js";
 
 dotenv.config();
@@ -85,11 +84,15 @@ app.use((err, req, res, _next) => {
 });
 
 const start = async () => {
-  await migrate();
-  initializeDatabase();
-  app.listen(port, () => {
-    console.log(`API server listening on port ${port}`);
-  });
+  try {
+    await migrate(); // Runs Postgres migrations and seeds admin
+    app.listen(port, () => {
+      console.log(`✅ API server listening on port ${port}`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err);
+    process.exit(1);
+  }
 };
 
 start().catch((err) => {
