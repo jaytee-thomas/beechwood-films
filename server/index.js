@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import authRouter from "./routes/auth.js";
-import videosRouter from "./routes/videos.js";
+//import videosRouter from "./routes/videos.js";
 import favoritesRouter from "./routes/favorites.js";
 import uploadsRouter from "./routes/uploads.js";
 import profileRouter from "./routes/profile.js";
@@ -49,7 +49,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRouter);
-app.use("/api/videos", videosRouter);
+//app.use("/api/videos", videosRouter);
 app.use("/api/favorites", favoritesRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/profile", profileRouter);
