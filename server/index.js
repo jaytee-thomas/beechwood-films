@@ -4,7 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-
+import uploadsRouter from "./routes/uploads.js";
 import authRouter from "./routes/auth.js";
 import videosRouter from "./routes/videos.js";
 import { attachAuth } from "./middleware/attachAuth.js";
@@ -51,6 +51,9 @@ app.get("/health", (req, res) => {
 
 // attach auth context globally before API routes
 app.use("/api", attachAuth);
+
+// uploads routes (requireAdmin now has access to req.auth)
+app.use("/api/uploads", uploadsRouter);
 
 // auth routes
 app.use("/api/auth", authRouter);

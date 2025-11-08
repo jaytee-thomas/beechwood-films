@@ -17,8 +17,10 @@
     "deploy:railway": "git commit --allow-empty -m \"force: rebuild\" && git push"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.913.0",
-    "@aws-sdk/s3-request-presigner": "^3.913.0",
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-s3": "^3.927.0",
+    "@aws-sdk/s3-request-presigner": "^3.927.0",
+    "@aws-sdk/signature-v4": "^3.370.0",
     "@vercel/speed-insights": "^1.2.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
