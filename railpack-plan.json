@@ -1,11 +1,13 @@
 {
-  "build": {
-    "steps": [
-      { "cmd": "npm ci" },
-      { "cmd": "echo 'skipping extra build step'" }
-    ]
-  },
-  "deploy": {
-    "cmd": "npm run start"
+  "phases": {
+    "install": {
+      "cmds": ["npm ci"]
+    },
+    "build": {
+      "cmds": ["npm run build || echo 'no build step'"]
+    },
+    "deploy": {
+      "cmds": ["npm run start"]
+    }
   }
 }
