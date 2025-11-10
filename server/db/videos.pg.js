@@ -7,29 +7,34 @@ const videoColumns = [
   "src",
   "provider",
   "provider_id",
-  "thumbnail",
+  "thumbnail_url",
   "library",
   "source",
   "duration",
+  "duration_seconds",
   "date",
   "description",
   "tags",
-  "created_at",
-  "updated_at",
-  "created_by",
-  "updated_by",
+  "published",
+  "status",
   "preview_src",
   "file_name",
   "size_bytes",
   "width",
   "height",
-  "status",
-  "published",
   "s3_key",
-  "r2_key"
+  "r2_key",
+  "created_at",
+  "updated_at"
 ];
 
 const selectColumns = videoColumns.join(", ");
+
+const toNullableNumber = (value) => {
+  if (value === null || value === undefined) return null;
+  const next = Number(value);
+  return Number.isFinite(next) ? next : null;
+};
 
 const parseTags = (value) => {
   if (!value) return [];
@@ -56,25 +61,25 @@ const toVideo = (row) => {
     id: row.id,
     title: row.title,
     embedUrl: row.embed_url,
-    src: row.src,
+    src: row.src ?? row.embed_url,
     provider: row.provider,
     providerId: row.provider_id,
-    thumbnail: row.thumbnail,
+    thumbnail: row.thumbnail_url ?? null,
+    thumbnailUrl: row.thumbnail_url ?? null,
     library: row.library,
     source: row.source,
     duration: row.duration,
+    durationSeconds: toNullableNumber(row.duration_seconds),
     date: row.date,
     description: row.description,
     tags: parseTags(row.tags),
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
-    createdBy: row.created_by,
-    updatedBy: row.updated_by,
     previewSrc: row.preview_src,
     fileName: row.file_name,
-    sizeBytes: row.size_bytes,
-    width: row.width,
-    height: row.height,
+    sizeBytes: toNullableNumber(row.size_bytes),
+    width: toNullableNumber(row.width),
+    height: toNullableNumber(row.height),
     status: row.status,
     published: row.published,
     s3Key: row.s3_key,
@@ -109,25 +114,29 @@ export const insertVideo = async (data = {}, authorId) => {
   const src = data.src || embedUrl;
   const provider = data.provider ?? null;
   const providerId = data.providerId ?? null;
-  const createdBy = authorId ?? data.createdBy ?? null;
   const createdAt = data.createdAt ?? now;
   const updatedAt = data.updatedAt ?? now;
+  const thumbnailUrl = data.thumbnailUrl ?? data.thumbnail ?? null;
+  const durationSeconds = toNullableNumber(
+    data.durationSeconds ?? data.duration_seconds
+  );
+  const sizeBytes = toNullableNumber(data.sizeBytes);
+  const width = toNullableNumber(data.width);
+  const height = toNullableNumber(data.height);
 
   const { rows } = await query(
     `INSERT INTO videos (
        title, embed_url, src, provider, provider_id,
-       thumbnail, library, source, duration, date,
-       description, tags, created_at, updated_at,
-       created_by, updated_by,
+       thumbnail_url, library, source, duration, duration_seconds,
+       date, description, tags, published, status,
        preview_src, file_name, size_bytes, width, height,
-       status, published, s3_key, r2_key
+       s3_key, r2_key, created_at, updated_at
      ) VALUES (
        $1, $2, $3, $4, $5,
        $6, $7, $8, $9, $10,
-       $11, $12::jsonb, $13, $14,
-       $15, $16,
-       $17, $18, $19, $20, $21,
-       $22, $23, $24, $25
+       $11, $12, $13::jsonb, $14, $15,
+       $16, $17, $18, $19, $20,
+       $21, $22, $23, $24
      )
      RETURNING ${selectColumns}`,
     [
@@ -136,26 +145,25 @@ export const insertVideo = async (data = {}, authorId) => {
       src,
       provider,
       providerId,
-      data.thumbnail ?? null,
+      thumbnailUrl,
       data.library ?? null,
       data.source ?? "api",
       data.duration ?? null,
+      durationSeconds,
       data.date ?? null,
       data.description ?? null,
       serializeTags(data.tags),
-      createdAt,
-      updatedAt,
-      createdBy,
-      createdBy,
+      data.published ?? false,
+      data.status ?? "draft",
       data.previewSrc ?? null,
       data.fileName ?? null,
-      data.sizeBytes ?? null,
-      data.width ?? null,
-      data.height ?? null,
-      data.status ?? "draft",
-      data.published ?? false,
+      sizeBytes,
+      width,
+      height,
       data.s3Key ?? null,
-      data.r2Key ?? null
+      data.r2Key ?? null,
+      createdAt,
+      updatedAt
     ]
   );
 
@@ -173,23 +181,25 @@ export const updateVideo = async (id, updates = {}, authorId) => {
     src: updates.src ?? updates.embedUrl ?? current.src,
     provider: updates.provider ?? current.provider,
     providerId: updates.providerId ?? current.providerId,
-    thumbnail: updates.thumbnail ?? current.thumbnail,
+    thumbnailUrl: updates.thumbnailUrl ?? updates.thumbnail ?? current.thumbnail,
     library: updates.library ?? current.library,
     source: updates.source ?? current.source,
     duration: updates.duration ?? current.duration,
+    durationSeconds: toNullableNumber(
+      updates.durationSeconds ?? current.durationSeconds
+    ),
     date: updates.date ?? current.date,
     description: updates.description ?? current.description,
     tags: updates.tags !== undefined ? updates.tags : current.tags,
     previewSrc: updates.previewSrc ?? current.previewSrc,
     fileName: updates.fileName ?? current.fileName,
-    sizeBytes: updates.sizeBytes ?? current.sizeBytes ?? null,
-    width: updates.width ?? current.width ?? null,
-    height: updates.height ?? current.height ?? null,
+    sizeBytes: toNullableNumber(updates.sizeBytes ?? current.sizeBytes),
+    width: toNullableNumber(updates.width ?? current.width),
+    height: toNullableNumber(updates.height ?? current.height),
     status: updates.status ?? current.status ?? "draft",
     published: updates.published ?? current.published ?? false,
     s3Key: updates.s3Key ?? current.s3Key ?? null,
-    r2Key: updates.r2Key ?? current.r2Key ?? null,
-    updatedBy: authorId ?? current.updatedBy ?? current.createdBy ?? null
+    r2Key: updates.r2Key ?? current.r2Key ?? null
   };
 
   const { rows } = await query(
@@ -199,24 +209,24 @@ export const updateVideo = async (id, updates = {}, authorId) => {
             src = $3,
             provider = $4,
             provider_id = $5,
-            thumbnail = $6,
+            thumbnail_url = $6,
             library = $7,
             source = $8,
             duration = $9,
-            date = $10,
-            description = $11,
-            tags = $12::jsonb,
-            updated_at = $13,
-            updated_by = $14,
-            preview_src = $15,
-            file_name = $16,
-            size_bytes = $17,
-            width = $18,
-            height = $19,
-            status = $20,
-            published = $21,
-            s3_key = $22,
-            r2_key = $23
+            duration_seconds = $10,
+            date = $11,
+            description = $12,
+            tags = $13::jsonb,
+            published = $14,
+            status = $15,
+            preview_src = $16,
+            file_name = $17,
+            size_bytes = $18,
+            width = $19,
+            height = $20,
+            s3_key = $21,
+            r2_key = $22,
+            updated_at = $23
       WHERE id = $24
       RETURNING ${selectColumns}`,
     [
@@ -225,24 +235,24 @@ export const updateVideo = async (id, updates = {}, authorId) => {
       next.src,
       next.provider,
       next.providerId,
-      next.thumbnail,
+      next.thumbnailUrl,
       next.library,
       next.source,
       next.duration,
+      next.durationSeconds,
       next.date,
       next.description,
       serializeTags(next.tags),
-      now,
-      next.updatedBy,
+      next.published,
+      next.status,
       next.previewSrc,
       next.fileName,
       next.sizeBytes,
       next.width,
       next.height,
-      next.status,
-      next.published,
       next.s3Key,
       next.r2Key,
+      now,
       id
     ]
   );
