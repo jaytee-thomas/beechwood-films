@@ -10,20 +10,14 @@ const parseNumber = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-/**
- * SSL detection:
- * - Explicit override via PGSSLMODE/PG_SSL
- * - Otherwise auto-enable for common managed PG providers, including Railway proxies:
- *   rlwy.net, proxy.rlwy.net, railway.app
- */
+// --- Detect if SSL is required ---
 const shouldUseSSL = (() => {
   const flag = (process.env.PGSSLMODE || process.env.PG_SSL || "").toLowerCase();
   if (flag === "disable" || flag === "false") return false;
   if (flag === "require" || flag === "true") return true;
 
-  // Auto-detect by connection string host
-  return /(neon\.tech|supabase\.co|railway\.app|rlwy\.net|proxy\.rlwy\.net|vercel-storage\.com)/i
-    .test(connectionString);
+  // 👇 Updated regex includes Railway domains
+  return /(neon\.tech|supabase\.co|railway\.app|rlwy\.net|proxy\.rlwy\.net|vercel-storage\.com)/i.test(connectionString);
 })();
 
 const pool = new Pool({
@@ -54,5 +48,25 @@ export const withTransaction = async (callback) => {
     client.release();
   }
 };
+
+// --- Optional: Retry logic for cold Railway boots ---
+const testConnection = async (retries = 5, delay = 5000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await pool.query("SELECT NOW()");
+      console.log("[pg] Connected to database ✅");
+      return;
+    } catch (err) {
+      console.warn(`[pg] Connection failed (${i + 1}/${retries}), retrying...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("Could not connect to Postgres after multiple retries");
+};
+
+testConnection().catch((err) => {
+  console.error("[pg] Startup connection failed", err);
+  process.exit(1);
+});
 
 export default pool;
