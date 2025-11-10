@@ -10,11 +10,20 @@ const parseNumber = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+/**
+ * SSL detection:
+ * - Explicit override via PGSSLMODE/PG_SSL
+ * - Otherwise auto-enable for common managed PG providers, including Railway proxies:
+ *   rlwy.net, proxy.rlwy.net, railway.app
+ */
 const shouldUseSSL = (() => {
   const flag = (process.env.PGSSLMODE || process.env.PG_SSL || "").toLowerCase();
   if (flag === "disable" || flag === "false") return false;
   if (flag === "require" || flag === "true") return true;
-  return /(neon\.tech|supabase\.co|railway\.app|vercel-storage\.com)/i.test(connectionString);
+
+  // Auto-detect by connection string host
+  return /(neon\.tech|supabase\.co|railway\.app|rlwy\.net|proxy\.rlwy\.net|vercel-storage\.com)/i
+    .test(connectionString);
 })();
 
 const pool = new Pool({
