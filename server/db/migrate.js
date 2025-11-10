@@ -41,22 +41,23 @@ const statements = [
   )`
 ];
 
-// ===== P1 EXTENSIONS (R2 + metadata) =====
-statements.push(
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS file_name TEXT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS size_bytes BIGINT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS width INT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS height INT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft'`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS published BOOLEAN DEFAULT FALSE`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS preview_src TEXT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS s3_key TEXT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS r2_key TEXT`
-);
+// === videos core schema extensions ===
+statements.push(`
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS file_name TEXT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS width INT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS height INT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS published BOOLEAN DEFAULT FALSE;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS preview_src TEXT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS s3_key TEXT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS r2_key TEXT;
+  ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;  -- ✅ ensure tags column exists
+`);
 
-// ===== Fallback snapshots =====
-statements.push(
-  `CREATE TABLE IF NOT EXISTS fallback_videos (
+// === Fallback snapshots ===
+statements.push(`
+  CREATE TABLE IF NOT EXISTS fallback_videos (
     position INT PRIMARY KEY,
     title TEXT NOT NULL,
     embed_url TEXT NOT NULL,
@@ -69,17 +70,10 @@ statements.push(
     duration TEXT,
     date TEXT,
     description TEXT,
-    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+    tags JSONB NOT NULL DEFAULT '[]'::jsonb,  -- ✅ already perfect
     file_name TEXT
-  )`,
-
-  `CREATE TABLE IF NOT EXISTS favorites (
-    user_id UUID NOT NULL,
-    video_id BIGINT NOT NULL,
-    created_at BIGINT NOT NULL,
-    PRIMARY KEY (user_id, video_id)
-  )`
-);
+  );
+`);
 
 let migrationPromise = null;
 
