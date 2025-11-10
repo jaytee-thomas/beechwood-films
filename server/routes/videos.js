@@ -118,20 +118,20 @@ const requireFields = (body, res) => {
   return true;
 };
 
-router.get("/", (req, res, next) => {
+router.get("/", async (_req, res, next) => {
   try {
-    const videos = listVideos();
+    const videos = await listVideos();
     res.json({ items: videos, page: 1, pageSize: videos.length || 20 });
   } catch (error) {
     next(error);
   }
 });
 
-router.post("/", requireAdmin, (req, res, next) => {
+router.post("/", requireAdmin, async (req, res, next) => {
   if (!requireFields(req.body, res)) return;
   try {
     const incoming = buildVideo(req.body, req.auth?.session?.user);
-    const created = insertVideo(incoming, req.auth?.session?.user?.id);
+    const created = await insertVideo(incoming, req.auth?.session?.user?.id);
     notifyUsersOfNewVideo(created).catch((error) =>
       console.error("notify failed", error)
     );
@@ -141,23 +141,23 @@ router.post("/", requireAdmin, (req, res, next) => {
   }
 });
 
-router.post("/fallback", requireAdmin, (req, res, next) => {
+router.post("/fallback", requireAdmin, async (_req, res, next) => {
   try {
-    const videos = listVideos();
-    saveFallbackVideos(videos);
+    const videos = await listVideos();
+    await saveFallbackVideos(videos);
     res.status(204).send();
   } catch (error) {
     next(error);
   }
 });
 
-router.put("/:id", requireAdmin, (req, res, next) => {
+router.put("/:id", requireAdmin, async (req, res, next) => {
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({ error: "Update payload is required" });
   }
   try {
     const id = Number(req.params.id);
-    const existing = getVideoById(id);
+    const existing = await getVideoById(id);
     if (!existing) {
       return res.status(404).json({ error: "Video not found" });
     }
@@ -174,17 +174,17 @@ router.put("/:id", requireAdmin, (req, res, next) => {
     if (typeof updates.description === "string") {
       updates.description = updates.description.trim();
     }
-    const updated = updateVideoRecord(id, updates, req.auth?.session?.user?.id);
+    const updated = await updateVideoRecord(id, updates, req.auth?.session?.user?.id);
     res.json({ video: updated });
   } catch (error) {
     next(error);
   }
 });
 
-router.delete("/:id", requireAdmin, (req, res, next) => {
+router.delete("/:id", requireAdmin, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    const removed = deleteVideoRecord(id);
+    const removed = await deleteVideoRecord(id);
     if (!removed) {
       return res.status(404).json({ error: "Video not found" });
     }
@@ -195,10 +195,10 @@ router.delete("/:id", requireAdmin, (req, res, next) => {
 });
 
 // === NEW: Publish endpoint ===
-router.post("/:id/publish", requireAdmin, (req, res, next) => {
+router.post("/:id/publish", requireAdmin, async (req, res, next) => {
   try {
     const id = req.params.id;
-    const updated = updateVideoRecord(id, {
+    const updated = await updateVideoRecord(id, {
       status: "published",
       published: true,
       updatedAt: Date.now()

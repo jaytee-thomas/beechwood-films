@@ -1,5 +1,4 @@
-import db from "./client.js";
-import { serializeTags } from "./videos.js";
+import { query, withTransaction } from "./pool.js";
 
 const columns = [
   "title",
@@ -17,77 +16,74 @@ const columns = [
   "file_name"
 ];
 
-export const saveFallbackVideos = (videos = []) => {
-  db.prepare("DELETE FROM fallback_videos").run();
-  if (!Array.isArray(videos) || videos.length === 0) return;
+const columnList = ["position", ...columns];
+const insertSql = `INSERT INTO fallback_videos (${columnList.join(", ")})
+                   VALUES (${columnList.map((_, idx) => `$${idx + 1}`).join(", ")})`;
 
-  const insert = db.prepare(
-    `INSERT INTO fallback_videos (${columns.join(", ")})
-     VALUES (${columns.map(() => "?").join(", ")})`
-  );
-
-  const toRow = (video) => [
-    video.title || "Untitled",
-    video.embedUrl || video.src || "",
-    video.src || video.embedUrl || "",
-    video.provider || null,
-    video.providerId || null,
-    video.thumbnail || null,
-    video.library || null,
-    video.source || "fallback",
-    video.duration || null,
-    video.date || null,
-    video.description || null,
-    serializeTags(video.tags),
-    video.fileName || null
-  ];
-
-  const insertMany = db.transaction((items) => {
-    items.forEach((video) => insert.run(...toRow(video)));
-  });
-
-  insertMany(videos);
+const normalizeTags = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return value
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    }
+  }
+  return [];
 };
 
-export const getFallbackVideos = () => {
-  return db.prepare(`SELECT rowid as position, ${columns.join(", ")} FROM fallback_videos ORDER BY position ASC`).all();
+const serializeTags = (value) => JSON.stringify(normalizeTags(value));
+
+const toRow = (video = {}, index = 0) => [
+  index + 1,
+  video.title || "Untitled",
+  video.embedUrl || video.src || "",
+  video.src || video.embedUrl || "",
+  video.provider || null,
+  video.providerId || null,
+  video.thumbnail || null,
+  video.library || null,
+  video.source || "fallback",
+  video.duration || null,
+  video.date || null,
+  video.description || null,
+  serializeTags(video.tags),
+  video.fileName || null
+];
+
+export const saveFallbackVideos = async (videos = []) => {
+  await withTransaction(async (client) => {
+    await client.query("DELETE FROM fallback_videos");
+    if (!Array.isArray(videos) || videos.length === 0) return;
+    for (let idx = 0; idx < videos.length; idx += 1) {
+      await client.query(insertSql, toRow(videos[idx], idx));
+    }
+  });
 };
 
-export const seedVideosFromFallback = () => {
-  const countRow = db.prepare("SELECT COUNT(*) as count FROM videos").get();
-  if (countRow.count > 0) return;
-
-  const fallback = getFallbackVideos();
-  if (!fallback.length) return;
-
-  const insert = db.prepare(
-    `INSERT INTO videos (
-      title, embed_url, src, provider, provider_id, thumbnail, library,
-      source, duration, date, description, tags, created_at, updated_at, created_by, updated_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`
+export const getFallbackVideos = async () => {
+  const { rows } = await query(
+    `SELECT ${columnList.join(", ")}
+       FROM fallback_videos
+      ORDER BY position ASC`
   );
+  return rows.map((row) => ({
+    ...row,
+    tags: normalizeTags(row.tags)
+  }));
+};
 
-  const now = Date.now();
-  const insertMany = db.transaction((rows) => {
-    rows.forEach((row) => {
-      insert.run(
-        row.title,
-        row.embed_url,
-        row.src,
-        row.provider,
-        row.provider_id,
-        row.thumbnail,
-        row.library,
-        row.source || "fallback",
-        row.duration,
-        row.date,
-        row.description,
-        row.tags,
-        now,
-        now
-      );
-    });
-  });
-
-  insertMany(fallback);
+export const seedVideosFromFallback = async () => {
+  const fallback = await getFallbackVideos();
+  if (!fallback.length) {
+    console.log("[fallback] no fallback data available");
+    return [];
+  }
+  console.log("[fallback] loaded", fallback.length, "snapshot entries");
+  return fallback;
 };

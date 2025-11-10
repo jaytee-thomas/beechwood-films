@@ -21,15 +21,23 @@ const statements = [
 
   // Videos table (base structure)
   `CREATE TABLE IF NOT EXISTS videos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id BIGSERIAL PRIMARY KEY,
     title TEXT NOT NULL,
+    embed_url TEXT NOT NULL,
+    src TEXT,
+    provider TEXT,
+    provider_id TEXT,
+    thumbnail TEXT,
+    library TEXT,
+    source TEXT,
+    duration TEXT,
+    date TEXT,
     description TEXT,
-    s3_key TEXT,
-    thumbnail_url TEXT,
-    duration_seconds INT,
-    published BOOLEAN DEFAULT FALSE,
+    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL
+    updated_at BIGINT NOT NULL,
+    created_by UUID,
+    updated_by UUID
   )`
 ];
 
@@ -39,9 +47,38 @@ statements.push(
   `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS size_bytes BIGINT`,
   `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS width INT`,
   `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS height INT`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'`,
-  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'custom'`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft'`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS published BOOLEAN DEFAULT FALSE`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS preview_src TEXT`,
+  `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS s3_key TEXT`,
   `ALTER TABLE IF EXISTS videos ADD COLUMN IF NOT EXISTS r2_key TEXT`
+);
+
+// ===== Fallback snapshots =====
+statements.push(
+  `CREATE TABLE IF NOT EXISTS fallback_videos (
+    position INT PRIMARY KEY,
+    title TEXT NOT NULL,
+    embed_url TEXT NOT NULL,
+    src TEXT,
+    provider TEXT,
+    provider_id TEXT,
+    thumbnail TEXT,
+    library TEXT,
+    source TEXT,
+    duration TEXT,
+    date TEXT,
+    description TEXT,
+    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+    file_name TEXT
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS favorites (
+    user_id UUID NOT NULL,
+    video_id BIGINT NOT NULL,
+    created_at BIGINT NOT NULL,
+    PRIMARY KEY (user_id, video_id)
+  )`
 );
 
 let migrationPromise = null;
