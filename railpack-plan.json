@@ -4,7 +4,10 @@
       "cmds": ["npm ci"]
     },
     "build": {
-      "cmds": ["npm run build || echo 'no build step'"]
+      "cmds": [
+        "rm -rf node_modules/.cache || true",
+        "npm run build || echo 'no build step'"
+      ]
     },
     "deploy": {
       "cmds": ["npm run start"]
