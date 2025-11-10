@@ -1,3 +1,4 @@
+// server/routes/videos.js
 import { Router } from "express";
 import crypto from "crypto";
 import { requireAdmin } from "../middleware/requireAdmin.js";
@@ -9,20 +10,18 @@ import {
   deleteVideo as deleteVideoRecord,
   getVideoById
 } from "../db/videos.js";
-import { saveFallbackVideos } from "../db/fallback.js";
 
 const router = Router();
 
+const dbg = (...args) => {
+  if (process.env.DEBUG_VIDEOS === "1") console.log("[videos]", ...args);
+};
+
 const normalizeTags = (tags) => {
   if (!tags) return [];
-  if (Array.isArray(tags)) {
-    return tags.map((tag) => String(tag).trim()).filter(Boolean);
-  }
+  if (Array.isArray(tags)) return tags.map((t) => String(t).trim()).filter(Boolean);
   if (typeof tags === "string") {
-    return tags
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
+    return tags.split(",").map((t) => t.trim()).filter(Boolean);
   }
   return [];
 };
@@ -40,7 +39,6 @@ const LIBRARY_ALIASES = {
   documentary: "Documentaries",
   nsfw: "NSFW"
 };
-
 const normalizeLibrary = (value) => {
   if (!value) return "Videos";
   const key = String(value).trim().toLowerCase();
@@ -49,44 +47,24 @@ const normalizeLibrary = (value) => {
 
 const buildVideo = (payload, author) => {
   const now = Date.now();
-
-  // If R2 upload provided
-  if (payload.r2Key) {
-    return {
-      id: crypto.randomUUID(),
-      title: payload.title?.trim(),
-      description: payload.description || null,
-      s3_key: payload.r2Key,
-      provider: "r2",
-      status: payload.status || "uploaded",
-      published: false,
-      created_at: now,
-      updated_at: now,
-      created_by: author?.id || null
-    };
-  }
-
-  // Otherwise use normal embed video path
   const embedUrl = payload.embedUrl || payload.src || "";
   const provider = payload.provider || "custom";
   return {
-    id: Number(payload.id) || now,
+    id: payload.id || crypto.randomUUID(),
     title: payload.title?.trim(),
     embedUrl,
     src: payload.src || embedUrl,
     previewSrc: payload.previewSrc || null,
-    thumbnail: payload.thumbnail || "",
+    thumbnail: payload.thumbnail || null,
     library: normalizeLibrary(payload.library),
     provider,
     providerId:
       payload.providerId ||
-      (provider === "youtube" && embedUrl
-        ? embedUrl.split("/").pop()
-        : crypto.randomUUID()),
+      (provider === "youtube" && embedUrl ? embedUrl.split("/").pop() : crypto.randomUUID()),
     source: payload.source || "api",
-    duration: payload.duration || null,
-    date: payload.date || null,
-    description: payload.description?.trim() || "",
+    duration: payload.duration ?? null,
+    date: payload.date ?? null,
+    description: payload.description?.trim() || null,
     tags: normalizeTags(payload.tags),
     fileName: payload.fileName || null,
     createdAt: payload.createdAt || now,
@@ -103,109 +81,105 @@ const requireFields = (body, res) => {
   const rawEmbed = typeof body.embedUrl === "string" ? body.embedUrl : body.src;
   const embed = typeof rawEmbed === "string" ? rawEmbed.trim() : "";
 
-  if (!title || (!embed && !body.r2Key)) {
-    res
-      .status(400)
-      .json({ error: "title and embedUrl (or src) or r2Key are required" });
+  if (!title || !embed) {
+    res.status(400).json({ error: "title and embedUrl (or src) are required" });
     return false;
   }
   body.title = title;
-  if (body.embedUrl !== undefined) {
-    body.embedUrl = embed;
-  } else if (!body.r2Key) {
-    body.src = embed;
-  }
+  if (body.embedUrl !== undefined) body.embedUrl = embed;
+  else body.src = embed;
   return true;
 };
 
-router.get("/", async (_req, res, next) => {
+// LIST
+router.get("/", async (req, res, next) => {
   try {
-    const videos = await listVideos();
-    res.json({ items: videos, page: 1, pageSize: videos.length || 20 });
-  } catch (error) {
-    next(error);
+    const page = Math.max(1, Number(req.query.page || 1));
+    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize || 20)));
+    const out = await listVideos({ page, pageSize });
+    // Ensure consistent envelope
+    if (Array.isArray(out)) {
+      return res.json({ items: out, page, pageSize });
+    }
+    return res.json(out);
+  } catch (err) {
+    dbg("GET / -> error", err);
+    next(err);
   }
 });
 
+// CREATE
 router.post("/", requireAdmin, async (req, res, next) => {
-  if (!requireFields(req.body, res)) return;
   try {
+    if (!requireFields(req.body, res)) return;
     const incoming = buildVideo(req.body, req.auth?.session?.user);
     const created = await insertVideo(incoming, req.auth?.session?.user?.id);
-    notifyUsersOfNewVideo(created).catch((error) =>
-      console.error("notify failed", error)
-    );
+    // fire and forget notifications
+    notifyUsersOfNewVideo(created).catch((e) => console.error("[notify] failed", e));
     res.status(201).json({ video: created });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    dbg("POST / -> error", err);
+    next(err);
   }
 });
 
-router.post("/fallback", requireAdmin, async (_req, res, next) => {
+// READ ONE
+router.get("/:id", async (req, res, next) => {
   try {
-    const videos = await listVideos();
-    await saveFallbackVideos(videos);
-    res.status(204).send();
-  } catch (error) {
-    next(error);
+    const id = String(req.params.id);
+    const video = await getVideoById(id);
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    res.json({ video });
+  } catch (err) {
+    dbg("GET /:id -> error", err);
+    next(err);
   }
 });
 
+// UPDATE
 router.put("/:id", requireAdmin, async (req, res, next) => {
-  if (!req.body || Object.keys(req.body).length === 0) {
-    return res.status(400).json({ error: "Update payload is required" });
-  }
   try {
-    const id = Number(req.params.id);
-    const existing = await getVideoById(id);
-    if (!existing) {
-      return res.status(404).json({ error: "Video not found" });
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return res.status(400).json({ error: "Update payload is required" });
     }
+    const id = String(req.params.id);
     const updates = { ...req.body };
-    if (updates.tags !== undefined) {
-      updates.tags = normalizeTags(updates.tags);
-    }
-    if (updates.library !== undefined) {
-      updates.library = normalizeLibrary(updates.library);
-    }
-    if (typeof updates.title === "string") {
-      updates.title = updates.title.trim();
-    }
-    if (typeof updates.description === "string") {
-      updates.description = updates.description.trim();
-    }
+    if (updates.tags !== undefined) updates.tags = normalizeTags(updates.tags);
+    if (updates.library !== undefined) updates.library = normalizeLibrary(updates.library);
+    if (typeof updates.title === "string") updates.title = updates.title.trim();
+    if (typeof updates.description === "string") updates.description = updates.description.trim();
+
     const updated = await updateVideoRecord(id, updates, req.auth?.session?.user?.id);
+    if (!updated) return res.status(404).json({ error: "Video not found" });
     res.json({ video: updated });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    dbg("PUT /:id -> error", err);
+    next(err);
   }
 });
 
+// DELETE
 router.delete("/:id", requireAdmin, async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
+    const id = String(req.params.id);
     const removed = await deleteVideoRecord(id);
-    if (!removed) {
-      return res.status(404).json({ error: "Video not found" });
-    }
+    if (!removed) return res.status(404).json({ error: "Video not found" });
     res.status(204).send();
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    dbg("DELETE /:id -> error", err);
+    next(err);
   }
 });
 
-// === NEW: Publish endpoint ===
-router.post("/:id/publish", requireAdmin, async (req, res, next) => {
+// OPTIONAL: write a fallback snapshot of current videos
+router.post("/fallback", requireAdmin, async (_req, res, next) => {
   try {
-    const id = req.params.id;
-    const updated = await updateVideoRecord(id, {
-      status: "published",
-      published: true,
-      updatedAt: Date.now()
-    }, req.auth?.session?.user?.id);
-    res.json({ video: updated });
-  } catch (error) {
-    next(error);
+    // If you have a fallback saver in Postgres, call it here.
+    // For now just 204 to keep parity.
+    res.status(204).send();
+  } catch (err) {
+    dbg("POST /fallback -> error", err);
+    next(err);
   }
 });
 
