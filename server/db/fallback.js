@@ -1,6 +1,7 @@
 import { query, withTransaction } from "./pool.js";
 
 const columns = [
+  "position",
   "title",
   "embed_url",
   "src",
@@ -16,9 +17,28 @@ const columns = [
   "file_name"
 ];
 
-const columnList = ["position", ...columns];
-const insertSql = `INSERT INTO fallback_videos (${columnList.join(", ")})
-                   VALUES (${columnList.map((_, idx) => `$${idx + 1}`).join(", ")})`;
+const insertSql = `
+  INSERT INTO fallback_videos (
+    position,
+    title,
+    embed_url,
+    src,
+    provider,
+    provider_id,
+    thumbnail,
+    library,
+    source,
+    duration,
+    date,
+    description,
+    tags,
+    file_name
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14
+  )
+`;
+
+const selectColumns = columns.join(", ");
 
 const normalizeTags = (value) => {
   if (!value) return [];
@@ -68,7 +88,7 @@ export const saveFallbackVideos = async (videos = []) => {
 
 export const getFallbackVideos = async () => {
   const { rows } = await query(
-    `SELECT ${columnList.join(", ")}
+    `SELECT ${selectColumns}
        FROM fallback_videos
       ORDER BY position ASC`
   );
