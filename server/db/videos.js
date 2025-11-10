@@ -1,4 +1,4 @@
-// Delegate to the Postgres version
+// videos shim -> postgres
+console.log("[videos-shim] using Postgres delegates");
 export * from "./videos.pg.js";
-// If someone imported a default, keep it harmlessly undefined:
 export default undefined;
