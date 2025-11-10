@@ -8,6 +8,7 @@ import { attachAuth } from "./middleware/attachAuth.js";
 import authRouter from "./routes/auth.js";
 import videosRouter from "./routes/videos.js";
 
+console.log("[boot] commit:", process.env.RAILWAY_GIT_COMMIT_SHA || "unknown");
 // uploads can crash at import if env is missing; import defensively
 let uploadsRouter = null;
 try {
