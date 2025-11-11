@@ -40,10 +40,11 @@ const statements = [
     description TEXT,
     tags JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL,
-    created_by UUID,
-    updated_by UUID
+    updated_at BIGINT NOT NULL
   )`,
+
+  `ALTER TABLE IF EXISTS videos
+     ALTER COLUMN id SET DEFAULT gen_random_uuid()`,
 
   // === VIDEO EXTENSIONS ===
   `ALTER TABLE videos ADD COLUMN IF NOT EXISTS file_name TEXT`,
