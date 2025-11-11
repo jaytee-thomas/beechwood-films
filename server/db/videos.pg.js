@@ -151,108 +151,95 @@ export async function getVideoById(id) {
   return mapRow(rows[0] || null);
 }
 
-export async function insertVideo(input) {
+export async function insertVideo(input = {}) {
   const now = Date.now();
+  const title = typeof input.title === "string" ? input.title.trim() : "";
+  const embedUrl =
+    typeof input.embedUrl === "string" ? input.embedUrl.trim() : "";
 
-  const title = (input?.title || "").trim();
-  const embedUrl = (input?.embedUrl || "").trim();
-  const src = (input?.src || "").trim();
-
-  if (!title) {
-    throw new Error("title is required");
-  }
-  // embed_url is NOT NULL in your schema
-  if (!embedUrl) {
-    throw new Error("embedUrl is required");
+  if (!title || !embedUrl) {
+    const err = new Error("title and embedUrl are required");
+    err.status = 400;
+    throw err;
   }
 
-  const tagsJson = serializeTags(input?.tags);
+  const srcRaw =
+    input.src != null ? String(input.src).trim() : embedUrl;
 
-  // Optional fields (fall back to null/undefined)
-  const provider = input?.provider ?? "custom";
-  const providerId = input?.providerId ?? null;
-  const thumbnail = input?.thumbnail ?? input?.thumbnailUrl ?? null;
-  const library = input?.library ?? null;
-  const source = input?.source ?? null;
-  // duration stored as TEXT; accept either numeric or string
+  const provider = input.provider ?? "custom";
+  const providerId = input.providerId ?? null;
+  const thumbnail = input.thumbnail ?? input.thumbnailUrl ?? null;
+  const library = input.library ?? null;
+  const source = input.source ?? null;
   const duration =
-    input?.duration != null
+    input.duration != null
       ? String(input.duration)
-      : input?.durationSeconds != null
+      : input.durationSeconds != null
       ? String(input.durationSeconds)
       : null;
-  const date = input?.date ?? null;
-  const description = input?.description ?? null;
+  const date = input.date ?? null;
+  const description = input.description ?? null;
 
-  const fileName = input?.fileName ?? null;
-  const sizeBytes = input?.sizeBytes ?? null;
-  const width = input?.width ?? null;
-  const height = input?.height ?? null;
-  const status = input?.status ?? "draft";
-  const published = input?.published ?? false;
-  const previewSrc = input?.previewSrc ?? null;
-  const s3Key = input?.s3Key ?? null;
-  const r2Key = input?.r2Key ?? null;
+  const fileName = input.fileName ?? null;
+  const sizeBytes = input.sizeBytes ?? null;
+  const width = input.width ?? null;
+  const height = input.height ?? null;
+  const status = input.status ?? "draft";
+  const published = input.published ?? true;
+  const previewSrc = input.previewSrc ?? null;
+  const s3Key = input.s3Key ?? null;
+  const r2Key = input.r2Key ?? null;
+  const tagsJson = serializeTags(input.tags);
 
-  const { rows } = await query(
-    `
+  const sql = `
     INSERT INTO videos (
-      title, embed_url, src,
-      provider, provider_id,
-      thumbnail, library, source,
-      duration, date, description,
-      tags, created_at, updated_at,
-      file_name, size_bytes, width, height,
-      status, published, preview_src,
-      s3_key, r2_key
+      title, embed_url, src, provider, provider_id, thumbnail,
+      library, source, duration, date, description, tags,
+      created_at, updated_at,
+      preview_src, file_name, size_bytes, width, height,
+      status, published, s3_key, r2_key
     ) VALUES (
-      $1, $2, NULLIF($3, ''),
-      $4, $5,
-      $6, $7, $8,
-      $9, $10, $11,
-      $12::jsonb, $13, $14,
-      $15, $16, $17, $18,
-      $19, $20, $21,
-      $22, $23
+      $1, $2, $3, $4, $5, $6,
+      $7, $8, $9, $10, $11, $12::jsonb,
+      $13, $13,
+      $14, $15, $16, $17, $18,
+      $19, $20, $21, $22
     )
-    RETURNING
-      id, title, embed_url, src,
-      provider, provider_id,
-      thumbnail, library, source,
-      duration, date, description,
-      tags, created_at, updated_at,
-      file_name, size_bytes, width, height,
-      status, published, preview_src,
-      s3_key, r2_key
-    `,
-    [
-      title,
-      embedUrl,
-      src,
-      provider,
-      providerId,
-      thumbnail,
-      library,
-      source,
-      duration,
-      date,
-      description,
-      tagsJson,
-      now,
-      now,
-      fileName,
-      sizeBytes,
-      width,
-      height,
-      status,
-      published,
-      previewSrc,
-      s3Key,
-      r2Key
-    ]
-  );
+    RETURNING *
+  `;
 
-  return { video: mapRow(rows[0]) };
+  const params = [
+    title,
+    embedUrl,
+    srcRaw,
+    provider,
+    providerId,
+    thumbnail,
+    library,
+    source,
+    duration,
+    date,
+    description,
+    tagsJson,
+    now,
+    previewSrc,
+    fileName,
+    sizeBytes,
+    width,
+    height,
+    status,
+    published,
+    s3Key,
+    r2Key
+  ];
+
+  const { rows } = await query(sql, params);
+  if (!rows[0]) {
+    const err = new Error("Insert did not return a row");
+    err.status = 500;
+    throw err;
+  }
+  return mapRow(rows[0]);
 }
 
 export async function updateVideo(id, input) {
