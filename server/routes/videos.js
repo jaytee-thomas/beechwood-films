@@ -6,8 +6,8 @@ import { notifyUsersOfNewVideo } from "../lib/notifications.js";
 import {
   listVideos,
   insertVideo,
-  updateVideo as updateVideoRecord,
-  deleteVideo as deleteVideoRecord,
+  updateVideo,
+  deleteVideo,
   getVideoById
 } from "../db/videos.js";
 
@@ -137,7 +137,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // UPDATE
-router.put("/:id", requireAdmin, async (req, res, next) => {
+const handleUpdate = async (req, res, next) => {
   try {
     if (!req.body || Object.keys(req.body).length === 0) {
       return res.status(400).json({ error: "Update payload is required" });
@@ -149,20 +149,24 @@ router.put("/:id", requireAdmin, async (req, res, next) => {
     if (typeof updates.title === "string") updates.title = updates.title.trim();
     if (typeof updates.description === "string") updates.description = updates.description.trim();
 
-    const updated = await updateVideoRecord(id, updates, req.auth?.session?.user?.id);
-    if (!updated) return res.status(404).json({ error: "Video not found" });
-    res.json({ video: updated });
+    const updated = await updateVideo(id, updates);
+    const video = updated?.video ?? updated;
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    res.json({ video });
   } catch (err) {
-    dbg("PUT /:id -> error", err);
+    dbg("UPDATE /:id -> error", err);
     next(err);
   }
-});
+};
+
+router.put("/:id", requireAdmin, handleUpdate);
+router.patch("/:id", requireAdmin, handleUpdate);
 
 // DELETE
 router.delete("/:id", requireAdmin, async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const removed = await deleteVideoRecord(id);
+    const removed = await deleteVideo(id);
     if (!removed) return res.status(404).json({ error: "Video not found" });
     res.status(204).send();
   } catch (err) {
