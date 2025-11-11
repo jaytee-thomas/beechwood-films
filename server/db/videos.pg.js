@@ -1,297 +1,355 @@
 import { query } from "./pool.js";
 
-const nowMs = () => Date.now();
-
-const normalizeTags = (input) => {
-  if (!input) return [];
-  if (Array.isArray(input)) {
-    return input.map((tag) => String(tag).trim()).filter(Boolean);
-  }
-  if (typeof input === "string") {
+/** Normalize incoming tags to a JSON array string (for ::jsonb cast). */
+function serializeTags(tags) {
+  if (tags == null) return "[]";
+  if (Array.isArray(tags)) return JSON.stringify(tags);
+  // allow comma-delimited
+  if (typeof tags === "string") {
     try {
-      const parsed = JSON.parse(input);
-      if (Array.isArray(parsed)) return normalizeTags(parsed);
+      const parsed = JSON.parse(tags);
+      return Array.isArray(parsed) ? JSON.stringify(parsed) : "[]";
     } catch {
-      // fall through to comma parsing
-    }
-    return input
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-  }
-  if (typeof input === "object") {
-    return normalizeTags(Object.values(input));
-  }
-  return [];
-};
-
-const toJsonbArrayString = (tags) => JSON.stringify(normalizeTags(tags));
-
-const toIntOrNull = (value) => {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-};
-
-const parseRowTags = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      return normalizeTags(value);
+      return JSON.stringify(
+        tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      );
     }
   }
-  return normalizeTags(value);
-};
+  return "[]";
+}
 
-const columns = [
-  "id",
-  "title",
-  "embed_url",
-  "src",
-  "provider",
-  "provider_id",
-  "library",
-  "source",
-  "duration",
-  "date",
-  "description",
-  "s3_key",
-  "thumbnail",
-  "published",
-  "created_at",
-  "updated_at",
-  "file_name",
-  "size_bytes",
-  "width",
-  "height",
-  "status",
-  "r2_key",
-  "preview_src",
-  "tags"
-].join(", ");
+/** Coerce duration text to number (seconds) if numeric, else null. */
+function toNumberOrNull(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
-const baseSelect = `SELECT ${columns} FROM videos`;
+/** DB row -> API shape */
+function mapRow(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    title: r.title,
+    // expose both embedUrl and src like legacy API
+    embedUrl: r.embed_url ?? null,
+    src: r.src ?? null,
 
-const mapRow = (row) => ({
-  id: row.id,
-  title: row.title,
-  embedUrl: row.embed_url,
-  src: row.src ?? row.embed_url,
-  provider: row.provider ?? "custom",
-  providerId: row.provider_id ?? null,
-  thumbnail: row.thumbnail ?? null,
-  thumbnailUrl: row.thumbnail ?? null,
-  library: row.library ?? null,
-  source: row.source ?? null,
-  duration: row.duration ?? null,
-  durationSeconds: toIntOrNull(row.duration),
-  date: row.date ?? null,
-  description: row.description ?? null,
-  tags: parseRowTags(row.tags),
-  createdAt: Number(row.created_at),
-  updatedAt: Number(row.updated_at),
-  previewSrc: row.preview_src ?? null,
-  fileName: row.file_name ?? null,
-  sizeBytes: row.size_bytes == null ? null : Number(row.size_bytes),
-  width: toIntOrNull(row.width),
-  height: toIntOrNull(row.height),
-  status: row.status ?? "draft",
-  published: row.published ?? false,
-  s3Key: row.s3_key ?? null,
-  r2Key: row.r2_key ?? null
-});
+    provider: r.provider ?? "custom",
+    providerId: r.provider_id ?? null,
 
-export const listVideos = async ({ page = 1, pageSize = 20 } = {}) => {
-  const limit = Math.max(1, Math.min(Number(pageSize) || 20, 100));
-  const safePage = Math.max(1, Number(page) || 1);
-  const offset = (safePage - 1) * limit;
+    // legacy & alt naming for thumbnail
+    thumbnail: r.thumbnail ?? null,
+    thumbnailUrl: r.thumbnail ?? null,
+
+    library: r.library ?? null,
+    source: r.source ?? null,
+
+    // duration persisted as TEXT (schema), also expose numeric if possible
+    duration: r.duration ?? null,
+    durationSeconds: toNumberOrNull(r.duration),
+
+    date: r.date ?? null,
+    description: r.description ?? null,
+
+    tags: Array.isArray(r.tags) ? r.tags : [],
+
+    createdAt: r.created_at ?? null,
+    updatedAt: r.updated_at ?? null,
+
+    // upload / file metadata (nullable)
+    previewSrc: r.preview_src ?? null,
+    fileName: r.file_name ?? null,
+    sizeBytes: r.size_bytes ?? null,
+    width: r.width ?? null,
+    height: r.height ?? null,
+
+    status: r.status ?? "draft",
+    published: r.published ?? false,
+
+    s3Key: r.s3_key ?? null,
+    r2Key: r.r2_key ?? null
+  };
+}
+
+/** ===== Queries =====
+ * Current schema (from your migrate.js):
+ *  - id UUID PK DEFAULT gen_random_uuid()
+ *  - title TEXT NOT NULL
+ *  - embed_url TEXT NOT NULL
+ *  - src TEXT
+ *  - provider TEXT
+ *  - provider_id TEXT
+ *  - thumbnail TEXT
+ *  - library TEXT
+ *  - source TEXT
+ *  - duration TEXT
+ *  - date TEXT
+ *  - description TEXT
+ *  - tags JSONB NOT NULL DEFAULT '[]'::jsonb
+ *  - created_at BIGINT NOT NULL
+ *  - updated_at BIGINT NOT NULL
+ *  - file_name TEXT
+ *  - size_bytes BIGINT
+ *  - width INT
+ *  - height INT
+ *  - status TEXT DEFAULT 'draft'
+ *  - published BOOLEAN DEFAULT FALSE
+ *  - preview_src TEXT
+ *  - s3_key TEXT
+ *  - r2_key TEXT
+ */
+
+export async function listVideos({ page = 1, pageSize = 20 } = {}) {
+  const limit = Math.max(1, Math.min(100, Number(pageSize) || 20));
+  const offset = Math.max(0, (Number(page) || 1) - 1) * limit;
 
   const { rows } = await query(
-    `${baseSelect}
-     ORDER BY published DESC, created_at DESC
-     LIMIT $1 OFFSET $2`,
+    `
+    SELECT
+      id, title, embed_url, src,
+      provider, provider_id,
+      thumbnail, library, source,
+      duration, date, description,
+      tags, created_at, updated_at,
+      file_name, size_bytes, width, height,
+      status, published, preview_src,
+      s3_key, r2_key
+    FROM videos
+    ORDER BY published DESC, created_at DESC
+    LIMIT $1 OFFSET $2
+    `,
     [limit, offset]
   );
 
   return {
     items: rows.map(mapRow),
-    page: safePage,
+    page: Number(page) || 1,
     pageSize: limit
   };
-};
+}
 
-export const getVideoById = async (id) => {
+export async function getVideoById(id) {
   const { rows } = await query(
-    `${baseSelect}
-     WHERE id = $1::uuid`,
+    `
+    SELECT
+      id, title, embed_url, src,
+      provider, provider_id,
+      thumbnail, library, source,
+      duration, date, description,
+      tags, created_at, updated_at,
+      file_name, size_bytes, width, height,
+      status, published, preview_src,
+      s3_key, r2_key
+    FROM videos
+    WHERE id = $1
+    `,
     [id]
   );
-  if (!rows.length) return null;
-  return mapRow(rows[0]);
-};
+  return mapRow(rows[0] || null);
+}
 
-export const insertVideo = async (payload = {}) => {
-  const createdAt = nowMs();
-  const updatedAt = createdAt;
-  const title = String(payload.title || "").trim();
+export async function insertVideo(input) {
+  const now = Date.now();
+
+  const title = (input?.title || "").trim();
+  const embedUrl = (input?.embedUrl || "").trim();
+  const src = (input?.src || "").trim();
+
   if (!title) {
-    const error = new Error("title is required");
-    error.status = 400;
-    throw error;
+    throw new Error("title is required");
   }
-
-  const embedUrl = String(payload.embedUrl || payload.src || "").trim();
+  // embed_url is NOT NULL in your schema
   if (!embedUrl) {
-    const error = new Error("embedUrl is required");
-    error.status = 400;
-    throw error;
+    throw new Error("embedUrl is required");
   }
 
-  const src = payload.src ? String(payload.src).trim() : embedUrl;
-  const published = payload.published === false ? false : true;
-  const status = String(payload.status || "draft");
-  const sizeBytes = payload.sizeBytes == null ? null : Number(payload.sizeBytes);
-  const width = toIntOrNull(payload.width);
-  const height = toIntOrNull(payload.height);
-  const tagsJson = toJsonbArrayString(payload.tags);
+  const tagsJson = serializeTags(input?.tags);
+
+  // Optional fields (fall back to null/undefined)
+  const provider = input?.provider ?? "custom";
+  const providerId = input?.providerId ?? null;
+  const thumbnail = input?.thumbnail ?? input?.thumbnailUrl ?? null;
+  const library = input?.library ?? null;
+  const source = input?.source ?? null;
+  // duration stored as TEXT; accept either numeric or string
+  const duration =
+    input?.duration != null
+      ? String(input.duration)
+      : input?.durationSeconds != null
+      ? String(input.durationSeconds)
+      : null;
+  const date = input?.date ?? null;
+  const description = input?.description ?? null;
+
+  const fileName = input?.fileName ?? null;
+  const sizeBytes = input?.sizeBytes ?? null;
+  const width = input?.width ?? null;
+  const height = input?.height ?? null;
+  const status = input?.status ?? "draft";
+  const published = input?.published ?? false;
+  const previewSrc = input?.previewSrc ?? null;
+  const s3Key = input?.s3Key ?? null;
+  const r2Key = input?.r2Key ?? null;
 
   const { rows } = await query(
-    `INSERT INTO videos (
-       title, embed_url, src, provider, provider_id,
-       library, source, duration, date, description,
-       s3_key, thumbnail, published,
-       created_at, updated_at, file_name, size_bytes, width, height,
-       status, r2_key, preview_src, tags
-     ) VALUES (
-       $1, $2, $3, $4, $5,
-       $6, $7, $8, $9, $10,
-       $11, $12, $13,
-       $14, $15, $16, $17, $18, $19,
-       $20, $21, $22, $23::jsonb
-     )
-     RETURNING ${columns}`,
+    `
+    INSERT INTO videos (
+      title, embed_url, src,
+      provider, provider_id,
+      thumbnail, library, source,
+      duration, date, description,
+      tags, created_at, updated_at,
+      file_name, size_bytes, width, height,
+      status, published, preview_src,
+      s3_key, r2_key
+    ) VALUES (
+      $1, $2, NULLIF($3, ''),
+      $4, $5,
+      $6, $7, $8,
+      $9, $10, $11,
+      $12::jsonb, $13, $14,
+      $15, $16, $17, $18,
+      $19, $20, $21,
+      $22, $23
+    )
+    RETURNING
+      id, title, embed_url, src,
+      provider, provider_id,
+      thumbnail, library, source,
+      duration, date, description,
+      tags, created_at, updated_at,
+      file_name, size_bytes, width, height,
+      status, published, preview_src,
+      s3_key, r2_key
+    `,
     [
       title,
       embedUrl,
       src,
-      payload.provider ?? "custom",
-      payload.providerId ?? null,
-      payload.library ?? null,
-      payload.source ?? "api",
-      payload.duration ?? (payload.durationSeconds ? String(payload.durationSeconds) : null),
-      payload.date ?? null,
-      payload.description ?? null,
-      payload.s3Key ?? null,
-      payload.thumbnail ?? payload.thumbnailUrl ?? null,
-      published,
-      createdAt,
-      updatedAt,
-      payload.fileName ?? null,
+      provider,
+      providerId,
+      thumbnail,
+      library,
+      source,
+      duration,
+      date,
+      description,
+      tagsJson,
+      now,
+      now,
+      fileName,
       sizeBytes,
       width,
       height,
       status,
-      payload.r2Key ?? null,
-      payload.previewSrc ?? null,
-      tagsJson
+      published,
+      previewSrc,
+      s3Key,
+      r2Key
     ]
   );
 
-  return mapRow(rows[0]);
-};
+  return { video: mapRow(rows[0]) };
+}
 
-export const updateVideo = async (id, updates = {}) => {
-  const fields = [];
-  const values = [];
-  let idx = 1;
-
-  const set = (column, value, cast = "") => {
-    fields.push(`${column} = $${idx}${cast}`);
-    values.push(value);
-    idx += 1;
+export async function updateVideo(id, input) {
+  // Dynamically build SET list, always bump updated_at
+  const sets = [];
+  const vals = [];
+  const add = (sql, v) => {
+    vals.push(v);
+    sets.push(sql.replace("?", `$${vals.length}`));
   };
 
-  if (updates.title !== undefined) {
-    set("title", String(updates.title || "").trim());
-  }
-  if (updates.embedUrl !== undefined || updates.src !== undefined) {
-    const nextEmbed = updates.embedUrl ?? updates.src;
-    const trimmed = String(nextEmbed || "").trim();
-    if (!trimmed) {
-      const error = new Error("embedUrl cannot be empty");
-      error.status = 400;
-      throw error;
-    }
-    set("embed_url", trimmed);
-  }
-  if (updates.src !== undefined) {
-    const nextSrc = updates.src;
-    set("src", nextSrc == null ? null : String(nextSrc).trim());
-  }
-  if (updates.description !== undefined) set("description", updates.description ?? null);
-  if (updates.s3Key !== undefined) set("s3_key", updates.s3Key ?? null);
-  if (updates.thumbnailUrl !== undefined || updates.thumbnail !== undefined) {
-    set("thumbnail", updates.thumbnail ?? updates.thumbnailUrl ?? null);
-  }
-  if (updates.providerId !== undefined) set("provider_id", updates.providerId ?? null);
-  if (updates.library !== undefined) set("library", updates.library ?? null);
-  if (updates.source !== undefined) set("source", updates.source ?? null);
-  if (updates.duration !== undefined) set("duration", updates.duration ?? null);
-  if (updates.date !== undefined) set("date", updates.date ?? null);
-  if (updates.durationSeconds !== undefined) {
-    set("duration", updates.durationSeconds == null ? null : String(updates.durationSeconds));
-  }
-  if (updates.published !== undefined) set("published", !!updates.published);
-  if (updates.fileName !== undefined) set("file_name", updates.fileName ?? null);
-  if (updates.sizeBytes !== undefined) {
-    set("size_bytes", updates.sizeBytes == null ? null : Number(updates.sizeBytes));
-  }
-  if (updates.width !== undefined) set("width", toIntOrNull(updates.width));
-  if (updates.height !== undefined) set("height", toIntOrNull(updates.height));
-  if (updates.status !== undefined) set("status", String(updates.status || "draft"));
-  if (updates.provider !== undefined) set("provider", updates.provider ?? "custom");
-  if (updates.r2Key !== undefined) set("r2_key", updates.r2Key ?? null);
-  if (updates.previewSrc !== undefined) set("preview_src", updates.previewSrc ?? null);
-  if (updates.tags !== undefined) set("tags", toJsonbArrayString(updates.tags), "::jsonb");
+  if (input.title !== undefined) add(`title = ?`, (input.title || "").trim());
+  if (input.embedUrl !== undefined)
+    add(`embed_url = ?`, (input.embedUrl || "").trim());
+  if (input.src !== undefined) add(`src = NULLIF(?, '')`, (input.src || "").trim());
+  if (input.provider !== undefined) add(`provider = ?`, input.provider ?? null);
+  if (input.providerId !== undefined) add(`provider_id = ?`, input.providerId ?? null);
 
-  set("updated_at", nowMs());
+  if (input.thumbnail !== undefined || input.thumbnailUrl !== undefined) {
+    add(`thumbnail = ?`, input.thumbnail ?? input.thumbnailUrl ?? null);
+  }
+  if (input.library !== undefined) add(`library = ?`, input.library ?? null);
+  if (input.source !== undefined) add(`source = ?`, input.source ?? null);
 
-  if (!fields.length) {
-    const current = await getVideoById(id);
-    if (!current) {
-      const error = new Error("Video not found");
-      error.status = 404;
-      throw error;
-    }
-    return current;
+  if (input.duration !== undefined || input.durationSeconds !== undefined) {
+    const dur =
+      input.duration != null
+        ? String(input.duration)
+        : input.durationSeconds != null
+        ? String(input.durationSeconds)
+        : null;
+    add(`duration = ?`, dur);
   }
 
-  values.push(id);
+  if (input.date !== undefined) add(`date = ?`, input.date ?? null);
+  if (input.description !== undefined) add(`description = ?`, input.description ?? null);
+
+  if (input.tags !== undefined) add(`tags = (?::jsonb)`, serializeTags(input.tags));
+
+  if (input.fileName !== undefined) add(`file_name = ?`, input.fileName ?? null);
+  if (input.sizeBytes !== undefined) add(`size_bytes = ?`, input.sizeBytes ?? null);
+  if (input.width !== undefined) add(`width = ?`, input.width ?? null);
+  if (input.height !== undefined) add(`height = ?`, input.height ?? null);
+  if (input.status !== undefined) add(`status = ?`, input.status ?? "draft");
+  if (input.published !== undefined) add(`published = ?`, !!input.published);
+  if (input.previewSrc !== undefined) add(`preview_src = ?`, input.previewSrc ?? null);
+  if (input.s3Key !== undefined) add(`s3_key = ?`, input.s3Key ?? null);
+  if (input.r2Key !== undefined) add(`r2_key = ?`, input.r2Key ?? null);
+
+  // Always update timestamp
+  add(`updated_at = ?`, Date.now());
+
+  if (sets.length === 0) {
+    // nothing to update; return current row
+    const { rows: cur } = await query(
+      `
+      SELECT
+        id, title, embed_url, src,
+        provider, provider_id,
+        thumbnail, library, source,
+        duration, date, description,
+        tags, created_at, updated_at,
+        file_name, size_bytes, width, height,
+        status, published, preview_src,
+        s3_key, r2_key
+      FROM videos
+      WHERE id = $1
+      `,
+      [id]
+    );
+    return { video: mapRow(cur[0] || null) };
+  }
+
+  vals.push(id);
 
   const { rows } = await query(
-    `UPDATE videos
-        SET ${fields.join(", ")}
-      WHERE id = $${idx}::uuid
-      RETURNING ${columns}`,
-    values
+    `
+    UPDATE videos
+    SET ${sets.join(", ")}
+    WHERE id = $${vals.length}
+    RETURNING
+      id, title, embed_url, src,
+      provider, provider_id,
+      thumbnail, library, source,
+      duration, date, description,
+      tags, created_at, updated_at,
+      file_name, size_bytes, width, height,
+      status, published, preview_src,
+      s3_key, r2_key
+    `,
+    vals
   );
 
-  if (!rows.length) {
-    const error = new Error("Video not found");
-    error.status = 404;
-    throw error;
-  }
+  return { video: mapRow(rows[0] || null) };
+}
 
-  return mapRow(rows[0]);
-};
-
-export const deleteVideo = async (id) => {
-  const { rowCount } = await query(
-    "DELETE FROM videos WHERE id = $1::uuid",
-    [id]
-  );
-  return rowCount > 0;
-};
+export async function deleteVideo(id) {
+  await query(`DELETE FROM videos WHERE id = $1`, [id]);
+  return { ok: true };
+}
