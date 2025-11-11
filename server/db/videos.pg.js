@@ -59,8 +59,7 @@ const columns = [
   "date",
   "description",
   "s3_key",
-  "thumbnail_url",
-  "duration_seconds",
+  "thumbnail",
   "published",
   "created_at",
   "updated_at",
@@ -83,12 +82,12 @@ const mapRow = (row) => ({
   src: row.src ?? row.embed_url,
   provider: row.provider ?? "custom",
   providerId: row.provider_id ?? null,
-  thumbnail: row.thumbnail_url ?? null,
-  thumbnailUrl: row.thumbnail_url ?? null,
+  thumbnail: row.thumbnail ?? null,
+  thumbnailUrl: row.thumbnail ?? null,
   library: row.library ?? null,
   source: row.source ?? null,
   duration: row.duration ?? null,
-  durationSeconds: toIntOrNull(row.duration_seconds),
+  durationSeconds: toIntOrNull(row.duration),
   date: row.date ?? null,
   description: row.description ?? null,
   tags: parseRowTags(row.tags),
@@ -154,7 +153,6 @@ export const insertVideo = async (payload = {}) => {
   const src = payload.src ? String(payload.src).trim() : embedUrl;
   const published = payload.published === false ? false : true;
   const status = String(payload.status || "draft");
-  const durationSeconds = toIntOrNull(payload.durationSeconds);
   const sizeBytes = payload.sizeBytes == null ? null : Number(payload.sizeBytes);
   const width = toIntOrNull(payload.width);
   const height = toIntOrNull(payload.height);
@@ -164,15 +162,15 @@ export const insertVideo = async (payload = {}) => {
     `INSERT INTO videos (
        title, embed_url, src, provider, provider_id,
        library, source, duration, date, description,
-       s3_key, thumbnail_url, duration_seconds, published,
+       s3_key, thumbnail, published,
        created_at, updated_at, file_name, size_bytes, width, height,
        status, r2_key, preview_src, tags
      ) VALUES (
        $1, $2, $3, $4, $5,
        $6, $7, $8, $9, $10,
-       $11, $12, $13, $14,
-       $15, $16, $17, $18, $19, $20,
-       $21, $22, $23, $24::jsonb
+       $11, $12, $13,
+       $14, $15, $16, $17, $18, $19,
+       $20, $21, $22, $23::jsonb
      )
      RETURNING ${columns}`,
     [
@@ -183,12 +181,11 @@ export const insertVideo = async (payload = {}) => {
       payload.providerId ?? null,
       payload.library ?? null,
       payload.source ?? "api",
-      payload.duration ?? null,
+      payload.duration ?? (payload.durationSeconds ? String(payload.durationSeconds) : null),
       payload.date ?? null,
       payload.description ?? null,
       payload.s3Key ?? null,
-      payload.thumbnailUrl ?? payload.thumbnail ?? null,
-      durationSeconds,
+      payload.thumbnail ?? payload.thumbnailUrl ?? null,
       published,
       createdAt,
       updatedAt,
@@ -237,7 +234,7 @@ export const updateVideo = async (id, updates = {}) => {
   if (updates.description !== undefined) set("description", updates.description ?? null);
   if (updates.s3Key !== undefined) set("s3_key", updates.s3Key ?? null);
   if (updates.thumbnailUrl !== undefined || updates.thumbnail !== undefined) {
-    set("thumbnail_url", updates.thumbnailUrl ?? updates.thumbnail ?? null);
+    set("thumbnail", updates.thumbnail ?? updates.thumbnailUrl ?? null);
   }
   if (updates.providerId !== undefined) set("provider_id", updates.providerId ?? null);
   if (updates.library !== undefined) set("library", updates.library ?? null);
@@ -245,7 +242,7 @@ export const updateVideo = async (id, updates = {}) => {
   if (updates.duration !== undefined) set("duration", updates.duration ?? null);
   if (updates.date !== undefined) set("date", updates.date ?? null);
   if (updates.durationSeconds !== undefined) {
-    set("duration_seconds", toIntOrNull(updates.durationSeconds));
+    set("duration", updates.durationSeconds == null ? null : String(updates.durationSeconds));
   }
   if (updates.published !== undefined) set("published", !!updates.published);
   if (updates.fileName !== undefined) set("file_name", updates.fileName ?? null);
