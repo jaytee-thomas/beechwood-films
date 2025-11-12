@@ -73,7 +73,51 @@ const statements = [
     description TEXT,
     tags JSONB NOT NULL DEFAULT '[]'::jsonb,
     file_name TEXT
-  )`
+  )`,
+
+  // === VIDEO JOB AUDIT (queue/worker telemetry) ===
+  `
+  CREATE EXTENSION IF NOT EXISTS pgcrypto
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS video_jobs (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id        TEXT,
+    queue         TEXT NOT NULL DEFAULT 'video',
+    type          TEXT NOT NULL,
+    tags          JSONB NOT NULL DEFAULT '[]'::jsonb,
+    actor_email   TEXT,
+    actor_user_id UUID,
+    payload       JSONB NOT NULL DEFAULT '{}'::jsonb,
+    result        JSONB,
+    error         JSONB,
+    status        TEXT NOT NULL DEFAULT 'queued',
+    attempts      INTEGER NOT NULL DEFAULT 0,
+    max_retries   INTEGER NOT NULL DEFAULT 3,
+    created_at    BIGINT NOT NULL,
+    started_at    BIGINT,
+    finished_at   BIGINT
+  )
+  `,
+  `
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'video_jobs_status_check'
+    ) THEN
+      ALTER TABLE video_jobs
+        ADD CONSTRAINT video_jobs_status_check
+        CHECK (status IN ('queued','running','succeeded','failed','cancelled'));
+    END IF;
+  END$$;
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_video_jobs_created_at ON video_jobs (created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_jobs_status_created ON video_jobs (status, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_jobs_type_created ON video_jobs (type, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_jobs_actor_email_created ON video_jobs (actor_email, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_jobs_job_id ON video_jobs (job_id)`
 ];
 
 // ===== MIGRATION EXECUTION =====

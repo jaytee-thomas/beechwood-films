@@ -15,6 +15,8 @@
     "start": "node server/index.js",
     "seed:admin": "node server/scripts/seed-admin.js",
     "smoke": "node server/scripts/smoke-test.mjs",
+    "smoke:queue": "node server/scripts/smoke-queue.mjs",
+    "worker:videos": "node server/workers/videoQueue.worker.js",
     "deploy:railway": "git commit --allow-empty -m \"force: rebuild\" && git push"
   },
   "dependencies": {
@@ -24,9 +26,11 @@
     "@aws-sdk/signature-v4": "^3.370.0",
     "@vercel/speed-insights": "^1.2.0",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.63.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "ioredis": "^5.8.2",
     "lucide-react": "^0.546.0",
     "pg": "^8.16.3",
     "react": "^19.1.1",

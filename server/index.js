@@ -5,8 +5,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { attachAuth } from "./middleware/attachAuth.js";
+import { getRedisHealth } from "./lib/redis.js";
 import authRouter from "./routes/auth.js";
 import videosRouter from "./routes/videos.js";
+import { router as queueRoutes } from "./routes/queues.js";
 
 console.log("[boot] commit:", process.env.RAILWAY_GIT_COMMIT_SHA || "unknown");
 // uploads can crash at import if env is missing; import defensively
@@ -59,10 +61,16 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/api/health/redis", async (_req, res) => {
+  const info = await getRedisHealth();
+  res.status(info.ready ? 200 : 503).json(info);
+});
+
 // middleware + routes
 app.use("/api", attachAuth);
 app.use("/api/auth", authRouter);
 app.use("/api/videos", videosRouter);
+app.use("/api", queueRoutes);
 if (uploadsRouter) app.use("/api/uploads", uploadsRouter);
 
 // static (prod)
