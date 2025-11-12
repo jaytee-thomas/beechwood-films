@@ -37,12 +37,12 @@ const ensureHealthClient = () => {
   return healthClient;
 };
 
-export const isRedisEnabled = Boolean(connectionOptions);
-
+export const getRedisConnection = () => connectionOptions;
 export const redisConnection = connectionOptions;
+export const isRedisEnabled = () => Boolean(connectionOptions);
 
 export const getRedisHealth = async () => {
-  if (!isRedisEnabled) {
+  if (!isRedisEnabled()) {
     return {
       enabled: false,
       ready: true,

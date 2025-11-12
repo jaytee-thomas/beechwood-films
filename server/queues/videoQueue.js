@@ -1,6 +1,8 @@
 import { Queue } from "bullmq";
-import { redisConnection, isRedisEnabled } from "../lib/redis.js";
-import { processVideoJob } from "../workers/processVideoJob.js";
+import {
+  getRedisConnection,
+  isRedisEnabled
+} from "../lib/redis.js";
 import {
   logEnqueued,
   logStarted,
@@ -8,116 +10,90 @@ import {
   logFailed,
   getRecent
 } from "../db/videoJobs.js";
+import { processVideoJob } from "../workers/processVideoJob.js";
 
-const QUEUE_NAME = "videoQueue";
+const QUEUE_NAME = "video";
+let queue = null;
 
-const queue = isRedisEnabled
-  ? new Queue(QUEUE_NAME, {
-      connection: redisConnection,
-      defaultJobOptions: {
-        removeOnComplete: 1000,
-        removeOnFail: 1000,
-        attempts: Number(process.env.WEBHOOK_MAX_RETRIES || 3),
-        backoff: { type: "exponential", delay: 1000 }
-      }
-    })
-  : null;
+export const videoQueueName = QUEUE_NAME;
 
-const queueEnabled = Boolean(queue);
+export const getVideoQueue = () => {
+  if (queue) return queue;
+  if (!isRedisEnabled()) return null;
 
-const enqueueQueueJob = async ({
-  type,
-  payload,
-  requestedBy,
-  requestedById,
-  videoId,
-  queueOptions = {}
-}) => {
-  const job = await queue.add(
-    type,
-    payload,
-    Object.assign(
-      {},
-      {
-        removeOnComplete: 1000,
-        removeOnFail: 1000
-      },
-      queueOptions
-    )
-  );
-
-  await logEnqueued({
-    jobId: job.id,
-    jobType: type,
-    requestedBy,
-    requestedById,
-    videoId,
-    payload
+  queue = new Queue(QUEUE_NAME, {
+    connection: getRedisConnection(),
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+      removeOnComplete: { age: 60 * 60 * 24, count: 1000 },
+      removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 },
+      timeout: 15 * 60 * 1000
+    }
   });
-
-  return { mode: "queue", jobId: job.id, job };
+  return queue;
 };
 
-const runInlineJob = async ({
-  type,
-  payload,
-  requestedBy,
-  requestedById,
-  videoId
-}) => {
-  const inlineId = `inline:${Date.now()}`;
-  await logEnqueued({
-    jobId: inlineId,
-    jobType: type,
-    requestedBy,
-    requestedById,
-    videoId,
-    payload
-  });
-  await logStarted({ jobId: inlineId, attempts: 1 });
-  const startedAt = Date.now();
-  try {
-    const result = await processVideoJob(payload);
-    await logCompleted({ jobId: inlineId, startedAt, result });
-    return { mode: "inline", jobId: inlineId, inline: true, result };
-  } catch (error) {
-    await logFailed({ jobId: inlineId, startedAt, error });
-    throw error;
-  }
-};
+export const isVideoQueueInline = () => !isRedisEnabled();
 
 export const enqueueVideoJob = async ({
   type = "recomputeVideoSignals",
   payload = {},
   requestedBy,
   requestedById,
-  videoId,
+  videoId = null,
   queueOptions = {}
 } = {}) => {
-  if (queueEnabled) {
-    return enqueueQueueJob({
+  const enrichedPayload = { ...payload, videoId };
+  const q = getVideoQueue();
+
+  if (q) {
+    const job = await q.add(
       type,
-      payload,
+      enrichedPayload,
+      Object.assign(
+        {
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 }
+        },
+        queueOptions
+      )
+    );
+    const jobId = String(job.id);
+    await logEnqueued({
+      jobId,
+      jobType: type,
       requestedBy,
       requestedById,
       videoId,
-      queueOptions
+      payload: enrichedPayload
     });
+    return { mode: "queue", jobId, job };
   }
 
-  return runInlineJob({
-    type,
-    payload,
+  const syntheticId = `inline:${Date.now()}`;
+  await logEnqueued({
+    jobId: syntheticId,
+    jobType: type,
     requestedBy,
     requestedById,
-    videoId
+    videoId,
+    payload: enrichedPayload
   });
+  await logStarted({ jobId: syntheticId, attempts: 1 });
+  const startedAt = Date.now();
+  try {
+    const result = await processVideoJob(enrichedPayload, {
+      jobId: syntheticId,
+      inline: true
+    });
+    await logCompleted({ jobId: syntheticId, startedAt, result });
+    return { mode: "inline", jobId: syntheticId, result };
+  } catch (error) {
+    await logFailed({ jobId: syntheticId, startedAt, error });
+    throw error;
+  }
 };
 
-export const addVideoJob = (name, payload = {}, options = {}) =>
-  enqueueVideoJob({ type: name, payload, queueOptions: options });
-
-export const getVideoQueue = () => queue;
-export const isVideoQueueInline = () => !queueEnabled;
-export const videoQueueName = QUEUE_NAME;
+export const addVideoJob = enqueueVideoJob;
 export const getRecentJobs = getRecent;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { QueueEvents } from "bullmq";
 import { enqueueVideoJob, videoQueueName, isVideoQueueInline } from "../queues/videoQueue.js";
-import { redisConnection } from "../lib/redis.js";
+import { getRedisConnection } from "../lib/redis.js";
 
 const run = async () => {
   const jobPayload = {
@@ -16,7 +16,9 @@ const run = async () => {
     return;
   }
 
-  const queueEvents = new QueueEvents(videoQueueName, { connection: redisConnection });
+  const queueEvents = new QueueEvents(videoQueueName, {
+    connection: getRedisConnection()
+  });
   await queueEvents.waitUntilReady();
 
   console.log("[queue:smoke] queue ready, enqueueing job...");

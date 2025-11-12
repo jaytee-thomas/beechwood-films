@@ -1,61 +1,74 @@
 import { Worker } from "bullmq";
-import { redisConnection, isRedisEnabled } from "../lib/redis.js";
-import { videoQueueName } from "../queues/videoQueue.js";
-import { processVideoJob } from "./processVideoJob.js";
+import { getRedisConnection, isRedisEnabled } from "../lib/redis.js";
 import {
   logStarted,
   logProgress,
   logCompleted,
   logFailed
 } from "../db/videoJobs.js";
+import { processVideoJob } from "./processVideoJob.js";
 
-if (!isRedisEnabled) {
-  console.warn("[videoQueue] Redis not configured; worker exiting.");
+const QUEUE_NAME = "video";
+
+if (!isRedisEnabled()) {
+  console.log("[videoQueue] Redis not configured; worker exiting.");
   process.exit(0);
 }
 
-const concurrency = Number(process.env.VIDEO_QUEUE_CONCURRENCY || 2);
-
 const worker = new Worker(
-  videoQueueName,
+  QUEUE_NAME,
   async (job) => {
-    await logStarted({ jobId: job.id, attempts: job.attemptsMade + 1 });
+    const jobId = String(job.id);
     const startedAt = Date.now();
+    await logStarted({
+      jobId,
+      jobType: job.name,
+      startedAt
+    });
+
+    const onProgress = async (p) => {
+      try {
+        await logProgress({
+          jobId,
+          progress: Math.floor((Number(p) || 0) * 100)
+        });
+      } catch (error) {
+        console.warn("[videoQueue] failed to log progress", error);
+      }
+      await job.updateProgress(Math.round((Number(p) || 0) * 100));
+    };
+
     try {
-      const result = await processVideoJob(job.data, { jobId: job.id });
-      await logCompleted({ jobId: job.id, startedAt, result });
+      const result = await processVideoJob(job.data, { jobId, onProgress });
+      await logCompleted({
+        jobId,
+        startedAt,
+        result
+      });
       return result;
     } catch (error) {
-      await logFailed({ jobId: job.id, startedAt, error });
+      await logFailed({
+        jobId,
+        startedAt,
+        error
+      });
       throw error;
     }
   },
   {
-    connection: redisConnection,
-    concurrency
+    connection: getRedisConnection(),
+    concurrency: 3,
+    lockDuration: 60_000,
+    maxStalledCount: 2
   }
 );
 
 worker.on("completed", (job) => {
-  console.log(`[videoQueue] job ${job.id} completed`);
+  console.log("[videoQueue] job completed:", job?.id);
 });
 
 worker.on("failed", (job, err) => {
-  console.error(`[videoQueue] job ${job?.id} failed`, err);
+  console.error("[videoQueue] job failed:", job?.id, err);
 });
 
-worker.on("progress", async (job, progress) => {
-  try {
-    await logProgress({ jobId: job.id, progress });
-  } catch (error) {
-    console.warn("[videoQueue] failed to log progress", error);
-  }
-});
-
-const shutdown = async () => {
-  await worker.close();
-  process.exit(0);
-};
-
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+console.log("[videoQueue] worker online with concurrency=3");
