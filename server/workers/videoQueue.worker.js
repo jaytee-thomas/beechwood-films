@@ -1,4 +1,5 @@
-import { Worker } from "bullmq";
+import pkg from "bullmq";
+const { Worker } = pkg;
 import IORedis from "ioredis";
 import { getRedisConfig } from "../lib/redis.js";
 import {

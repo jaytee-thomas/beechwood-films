@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { QueueEvents } from "bullmq";
+import pkg from "bullmq";
+const { QueueEvents } = pkg;
 import IORedis from "ioredis";
 import { enqueueVideoJob, videoQueueName, isVideoQueueInline } from "../queues/videoQueue.js";
 import { getRedisConfig } from "../lib/redis.js";
