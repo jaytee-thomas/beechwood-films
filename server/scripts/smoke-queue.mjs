@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { QueueEvents } from "bullmq";
-import { addVideoJob, videoQueueName, isVideoQueueInline } from "../queues/videoQueue.js";
+import { enqueueVideoJob, videoQueueName, isVideoQueueInline } from "../queues/videoQueue.js";
 import { redisConnection } from "../lib/redis.js";
 
 const run = async () => {
@@ -11,7 +11,7 @@ const run = async () => {
 
   if (isVideoQueueInline()) {
     console.log("[queue:smoke] Redis not configured, running inline.");
-    await addVideoJob("smoke", jobPayload);
+    await enqueueVideoJob({ type: "smoke", payload: jobPayload });
     console.log("[queue:smoke] Inline processing complete.");
     return;
   }
@@ -20,7 +20,11 @@ const run = async () => {
   await queueEvents.waitUntilReady();
 
   console.log("[queue:smoke] queue ready, enqueueing job...");
-  const job = await addVideoJob("smoke", jobPayload, { removeOnComplete: true });
+  const { jobId } = await enqueueVideoJob({
+    type: "smoke",
+    payload: jobPayload,
+    queueOptions: { removeOnComplete: 100 }
+  });
 
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -28,17 +32,17 @@ const run = async () => {
       reject(new Error("job completion timeout"));
     }, Number(process.env.WEBHOOK_TIMEOUT_MS || 4000));
 
-    queueEvents.on("completed", ({ jobId }) => {
-      if (jobId === job.id) {
+    queueEvents.on("completed", ({ jobId: completedId }) => {
+      if (completedId === jobId) {
         clearTimeout(timeout);
         queueEvents.removeAllListeners();
-        console.log("[queue:smoke] job completed:", jobId);
+        console.log("[queue:smoke] job completed:", completedId);
         resolve();
       }
     });
 
-    queueEvents.on("failed", ({ jobId, failedReason }) => {
-      if (jobId === job.id) {
+    queueEvents.on("failed", ({ jobId: failedId, failedReason }) => {
+      if (failedId === jobId) {
         clearTimeout(timeout);
         queueEvents.removeAllListeners();
         reject(new Error(`job failed: ${failedReason}`));

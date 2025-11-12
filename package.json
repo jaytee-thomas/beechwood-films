@@ -17,6 +17,7 @@
     "smoke": "node server/scripts/smoke-test.mjs",
     "smoke:queue": "node server/scripts/smoke-queue.mjs",
     "worker:videos": "node server/workers/videoQueue.worker.js",
+    "migrate": "node server/db/migrate.js",
     "deploy:railway": "git commit --allow-empty -m \"force: rebuild\" && git push"
   },
   "dependencies": {
