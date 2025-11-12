@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { QueueEvents } from "bullmq";
+import IORedis from "ioredis";
 import { enqueueVideoJob, videoQueueName, isVideoQueueInline } from "../queues/videoQueue.js";
-import { getRedisConnection } from "../lib/redis.js";
+import { getRedisConfig } from "../lib/redis.js";
 
 const run = async () => {
   const jobPayload = {
@@ -16,8 +17,17 @@ const run = async () => {
     return;
   }
 
+  const cfg = getRedisConfig();
+  if (!cfg.enabled || !cfg.url) {
+    console.error("[queue:smoke] Redis config missing");
+    process.exit(1);
+  }
+
   const queueEvents = new QueueEvents(videoQueueName, {
-    connection: getRedisConnection()
+    connection: new IORedis(cfg.url, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true
+    })
   });
   await queueEvents.waitUntilReady();
 

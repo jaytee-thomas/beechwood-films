@@ -1,74 +1,86 @@
 import { Worker } from "bullmq";
-import { getRedisConnection, isRedisEnabled } from "../lib/redis.js";
+import IORedis from "ioredis";
+import { getRedisConfig } from "../lib/redis.js";
 import {
   logStarted,
   logProgress,
   logCompleted,
   logFailed
 } from "../db/videoJobs.js";
+import { bus } from "../lib/events.js";
 import { processVideoJob } from "./processVideoJob.js";
 
-const QUEUE_NAME = "video";
-
-if (!isRedisEnabled()) {
+const cfg = getRedisConfig();
+if (!cfg.enabled || !cfg.url) {
   console.log("[videoQueue] Redis not configured; worker exiting.");
   process.exit(0);
 }
 
-const worker = new Worker(
-  QUEUE_NAME,
-  async (job) => {
-    const jobId = String(job.id);
-    const startedAt = Date.now();
-    await logStarted({
-      jobId,
-      jobType: job.name,
-      startedAt
-    });
+const connection = new IORedis(cfg.url, {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: true
+});
 
-    const onProgress = async (p) => {
-      try {
-        await logProgress({
-          jobId,
-          progress: Math.floor((Number(p) || 0) * 100)
-        });
-      } catch (error) {
-        console.warn("[videoQueue] failed to log progress", error);
-      }
-      await job.updateProgress(Math.round((Number(p) || 0) * 100));
+const emit = (phase, payload) => {
+  bus.emit("job:event", { phase, at: Date.now(), ...payload });
+};
+
+const startTimes = new Map();
+
+const worker = new Worker(
+  "video",
+  async (job) => {
+    const meta = {
+      jobId: String(job.id),
+      type: job.name,
+      videoId: job.data?.videoId ?? null,
+      requestedBy: job.data?.requestedBy ?? null,
+      requestedById: job.data?.requestedById ?? null
     };
 
-    try {
-      const result = await processVideoJob(job.data, { jobId, onProgress });
-      await logCompleted({
-        jobId,
-        startedAt,
-        result
-      });
-      return result;
-    } catch (error) {
-      await logFailed({
-        jobId,
-        startedAt,
-        error
-      });
-      throw error;
-    }
+    await logStarted({ jobId: meta.jobId, attempts: job.attemptsMade + 1 });
+    emit("started", meta);
+
+    const progressHandler = async (pct) => {
+      const progress = Math.max(0, Math.min(100, Math.round((Number(pct) || 0) * 100)));
+      await logProgress({ jobId: meta.jobId, progress });
+      emit("progress", { ...meta, progress });
+      await job.updateProgress(progress);
+    };
+
+    const startedAt = Date.now();
+    startTimes.set(meta.jobId, startedAt);
+    const result = await processVideoJob(job, { onProgress: progressHandler });
+    await logCompleted({ jobId: meta.jobId, startedAt, result });
+    emit("completed", { ...meta, result });
+    startTimes.delete(meta.jobId);
+    return result;
   },
   {
-    connection: getRedisConnection(),
-    concurrency: 3,
+    connection,
+    concurrency: Number(process.env.VIDEO_QUEUE_CONCURRENCY || 3),
     lockDuration: 60_000,
     maxStalledCount: 2
   }
 );
 
+worker.on("failed", async (job, err) => {
+  const meta = {
+    jobId: job?.id ? String(job.id) : null,
+    type: job?.name,
+    videoId: job?.data?.videoId ?? null,
+    requestedBy: job?.data?.requestedBy ?? null,
+    requestedById: job?.data?.requestedById ?? null
+  };
+  const startedAt = meta.jobId ? startTimes.get(meta.jobId) ?? null : null;
+  if (meta.jobId) startTimes.delete(meta.jobId);
+  await logFailed({ jobId: meta.jobId, startedAt, error: err });
+  emit("failed", { ...meta, error: err?.message || "unknown_error" });
+  console.error("[videoQueue] job failed:", job?.id, err);
+});
+
 worker.on("completed", (job) => {
   console.log("[videoQueue] job completed:", job?.id);
 });
 
-worker.on("failed", (job, err) => {
-  console.error("[videoQueue] job failed:", job?.id, err);
-});
-
-console.log("[videoQueue] worker online with concurrency=3");
+console.log("[videoQueue.worker] started with concurrency=3");

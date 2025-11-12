@@ -1,40 +1,62 @@
-import { Queue } from "bullmq";
-import {
-  getRedisConnection,
-  isRedisEnabled
-} from "../lib/redis.js";
+import { Queue, QueueScheduler } from "bullmq";
+import IORedis from "ioredis";
+import { getRedisConfig } from "../lib/redis.js";
 import {
   logEnqueued,
   logStarted,
+  logProgress,
   logCompleted,
   logFailed,
-  getRecent
+  getRecent as getRecentJobsFromDb
 } from "../db/videoJobs.js";
+import { bus } from "../lib/events.js";
 import { processVideoJob } from "../workers/processVideoJob.js";
 
-const QUEUE_NAME = "video";
 let queue = null;
+let scheduler = null;
+let mode = "inline";
 
-export const videoQueueName = QUEUE_NAME;
+const defaultQueueOpts = {
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 250 },
+    removeOnComplete: 1000,
+    removeOnFail: 2000
+  },
+  limiter: { max: 10, duration: 1000 },
+  maxStalledCount: 2
+};
+
+const createConnection = () => {
+  const cfg = getRedisConfig();
+  if (!cfg.enabled || !cfg.url) return null;
+  return new IORedis(cfg.url, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    lazyConnect: false
+  });
+};
 
 export const getVideoQueue = () => {
   if (queue) return queue;
-  if (!isRedisEnabled()) return null;
-
-  queue = new Queue(QUEUE_NAME, {
-    connection: getRedisConnection(),
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: "exponential", delay: 5000 },
-      removeOnComplete: { age: 60 * 60 * 24, count: 1000 },
-      removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 },
-      timeout: 15 * 60 * 1000
-    }
-  });
+  const connection = createConnection();
+  if (!connection) {
+    mode = "inline";
+    return null;
+  }
+  queue = new Queue("video", { connection, ...defaultQueueOpts });
+  scheduler = scheduler ?? new QueueScheduler("video", { connection });
+  mode = "queue";
   return queue;
 };
 
-export const isVideoQueueInline = () => !isRedisEnabled();
+export const getQueueMode = () => mode;
+
+export const isVideoQueueInline = () => !getRedisConfig().enabled;
+
+const emitJobEvent = (phase, payload) => {
+  bus.emit("job:event", { phase, at: Date.now(), ...payload });
+};
 
 export const enqueueVideoJob = async ({
   type = "recomputeVideoSignals",
@@ -44,17 +66,22 @@ export const enqueueVideoJob = async ({
   videoId = null,
   queueOptions = {}
 } = {}) => {
-  const enrichedPayload = { ...payload, videoId };
+  const jobPayload = {
+    ...payload,
+    videoId,
+    requestedBy: requestedBy ?? null,
+    requestedById: requestedById ?? null
+  };
   const q = getVideoQueue();
 
   if (q) {
     const job = await q.add(
       type,
-      enrichedPayload,
+      jobPayload,
       Object.assign(
         {
           attempts: 3,
-          backoff: { type: "exponential", delay: 5000 }
+          backoff: { type: "exponential", delay: 250 }
         },
         queueOptions
       )
@@ -66,8 +93,9 @@ export const enqueueVideoJob = async ({
       requestedBy,
       requestedById,
       videoId,
-      payload: enrichedPayload
+      payload: jobPayload
     });
+    emitJobEvent("enqueued", { jobId, type, videoId, requestedBy, requestedById });
     return { mode: "queue", jobId, job };
   }
 
@@ -78,22 +106,67 @@ export const enqueueVideoJob = async ({
     requestedBy,
     requestedById,
     videoId,
-    payload: enrichedPayload
+    payload: jobPayload
   });
   await logStarted({ jobId: syntheticId, attempts: 1 });
+  emitJobEvent("started", {
+    jobId: syntheticId,
+    type,
+    videoId,
+    requestedBy,
+    requestedById
+  });
+
   const startedAt = Date.now();
-  try {
-    const result = await processVideoJob(enrichedPayload, {
+  const progressHandler = async (pct) => {
+    const progress = Math.max(0, Math.min(100, Math.round((Number(pct) || 0) * 100)));
+    await logProgress({ jobId: syntheticId, progress });
+    emitJobEvent("progress", {
       jobId: syntheticId,
-      inline: true
+      type,
+      videoId,
+      requestedBy,
+      requestedById,
+      progress
     });
+  };
+
+  try {
+    const result = await processVideoJob(
+      { id: syntheticId, name: type, data: jobPayload },
+      { onProgress: progressHandler }
+    );
     await logCompleted({ jobId: syntheticId, startedAt, result });
+    emitJobEvent("completed", {
+      jobId: syntheticId,
+      type,
+      videoId,
+      requestedBy,
+      requestedById,
+      result
+    });
     return { mode: "inline", jobId: syntheticId, result };
   } catch (error) {
     await logFailed({ jobId: syntheticId, startedAt, error });
+    emitJobEvent("failed", {
+      jobId: syntheticId,
+      type,
+      videoId,
+      requestedBy,
+      requestedById,
+      error: error?.message || String(error)
+    });
     throw error;
   }
 };
 
 export const addVideoJob = enqueueVideoJob;
-export const getRecentJobs = getRecent;
+
+export const getRecentJobs = getRecentJobsFromDb;
+
+export const obliterateVideoQueue = async ({ force = false } = {}) => {
+  const q = getVideoQueue();
+  if (!q) return { ok: true, mode };
+  await q.obliterate({ force: !!force });
+  return { ok: true, mode: "queue" };
+};
