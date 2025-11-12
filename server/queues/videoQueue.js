@@ -1,4 +1,5 @@
-import { Queue, QueueScheduler } from "bullmq";
+import pkg from "bullmq";
+const { Queue, QueueScheduler } = pkg;
 import IORedis from "ioredis";
 import { getRedisConfig } from "../lib/redis.js";
 import {
