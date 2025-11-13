@@ -8,7 +8,12 @@ type SseEvent = {
   at: number;
 };
 
-const STATUS_ORDER = ["failed", "succeeded", "running", "queued"];
+const STATUS_PRIORITY: Record<string, number> = {
+  failed: 0,
+  running: 1,
+  queued: 2,
+  succeeded: 3
+};
 
 const formatEpoch = (value: string | null) => {
   if (!value) return "—";
@@ -40,10 +45,10 @@ export const AdminJobsMonitor: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const incoming = await fetchRecentJobs();
-      setJobs(incoming);
+      const data = await fetchRecentJobs();
+      setJobs(data);
     } catch (err: any) {
-      console.error("Failed to fetch queue jobs", err);
+      console.error("Failed to load queue jobs", err);
       setError(err?.message ?? "Failed to load jobs");
     } finally {
       setLoading(false);
@@ -64,7 +69,7 @@ export const AdminJobsMonitor: React.FC = () => {
       try {
         parsed = JSON.parse(data);
       } catch {
-        /* ignore */
+        /* keep as string */
       }
       setEvents((prev) => {
         const next: SseEvent[] = [
@@ -93,16 +98,19 @@ export const AdminJobsMonitor: React.FC = () => {
 
   const filteredJobs = useMemo(() => {
     let list = [...jobs];
-    if (statusFilter !== "all") {
-      list = list.filter((job) => job.status === statusFilter);
-    }
-    list.sort((a, b) => Number(b.created_at ?? 0) - Number(a.created_at ?? 0));
+    if (statusFilter !== "all") list = list.filter((job) => job.status === statusFilter);
+    list.sort((a, b) => {
+      const sa = STATUS_PRIORITY[a.status] ?? 99;
+      const sb = STATUS_PRIORITY[b.status] ?? 99;
+      if (sa !== sb) return sa - sb;
+      return Number(b.created_at ?? 0) - Number(a.created_at ?? 0);
+    });
     return list;
   }, [jobs, statusFilter]);
 
   return (
     <div style={{ padding: "1.5rem", maxWidth: 1200, margin: "0 auto" }}>
-      <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.75rem" }}>
+      <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
         Admin · Jobs Monitor
       </h1>
       <p style={{ marginBottom: "1rem", color: "#555" }}>
@@ -119,7 +127,7 @@ export const AdminJobsMonitor: React.FC = () => {
         }}
       >
         <button
-          onClick={loadJobs}
+          onClick={() => void loadJobs()}
           disabled={loading}
           style={{
             padding: "0.4rem 0.8rem",
@@ -138,7 +146,7 @@ export const AdminJobsMonitor: React.FC = () => {
             style={{ padding: "0.25rem 0.5rem", borderRadius: 999 }}
           >
             <option value="all">All</option>
-            {STATUS_ORDER.map((status) => (
+            {Object.keys(STATUS_PRIORITY).map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
@@ -209,7 +217,7 @@ export const AdminJobsMonitor: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredJobs.length === 0 && (
+                {filteredJobs.length === 0 && !loading && (
                   <tr>
                     <td colSpan={7} style={{ padding: "1rem", textAlign: "center", color: "#777" }}>
                       No jobs yet.
@@ -224,3 +232,97 @@ export const AdminJobsMonitor: React.FC = () => {
                     <td
                       style={{
                         padding: "0.4rem 0.5rem",
+                        borderBottom: "1px solid #f3f3f3",
+                        textTransform: "capitalize"
+                      }}
+                    >
+                      {job.status}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.5rem", borderBottom: "1px solid #f3f3f3" }}>
+                      {job.type}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.5rem", borderBottom: "1px solid #f3f3f3" }}>
+                      {job.video_id ? <code>{job.video_id}</code> : <span style={{ color: "#aaa" }}>—</span>}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.5rem", borderBottom: "1px solid #f3f3f3" }}>
+                      <div>{formatEpoch(job.started_at)}</div>
+                      <div style={{ color: "#999", fontSize: "0.8rem" }}>→ {formatEpoch(job.finished_at)}</div>
+                    </td>
+                    <td style={{ padding: "0.4rem 0.5rem", borderBottom: "1px solid #f3f3f3" }}>
+                      {formatDuration(job.started_at, job.finished_at)}
+                    </td>
+                    <td style={{ padding: "0.4rem 0.5rem", borderBottom: "1px solid #f3f3f3", textAlign: "center" }}>
+                      {job.attempts}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            backgroundColor: "#fff",
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <div
+            style={{
+              padding: "0.75rem 1rem",
+              borderBottom: "1px solid #eee",
+              background: "#fafafa",
+              display: "flex",
+              justifyContent: "space-between"
+            }}
+          >
+            <strong>Job Event Stream</strong>
+            <span style={{ fontSize: "0.8rem", color: "#666" }}>
+              Showing last {events.length} events
+            </span>
+          </div>
+          <div
+            style={{
+              flex: 1,
+              maxHeight: 400,
+              overflow: "auto",
+              padding: "0.5rem 0.75rem",
+              fontFamily: "Menlo, Monaco, Consolas, monospace",
+              fontSize: "0.8rem",
+              backgroundColor: "#fafafa"
+            }}
+          >
+            {events.length === 0 && (
+              <div style={{ color: "#888", padding: "0.25rem 0" }}>Waiting for events…</div>
+            )}
+            {events.map((evt) => (
+              <div
+                key={evt.id}
+                style={{
+                  marginBottom: "0.4rem",
+                  borderBottom: "1px dashed #ececec",
+                  paddingBottom: "0.3rem"
+                }}
+              >
+                <div style={{ color: "#555" }}>
+                  <strong>{evt.event}</strong>{" "}
+                  <span style={{ color: "#999", fontSize: "0.75rem" }}>
+                    {new Date(evt.at).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div style={{ color: "#333", whiteSpace: "pre-wrap" }}>
+                  {typeof evt.data === "string"
+                    ? evt.data
+                    : JSON.stringify(evt.data, null, 2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
