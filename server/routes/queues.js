@@ -13,7 +13,7 @@ router.post("/queues/video/recompute", requireAdmin, async (req, res, next) => {
     const videoId =
       typeof rawId === "string" && rawId.trim().length > 0 ? rawId.trim() : null;
 
-    const job = await enqueueVideoJob({
+    const result = await enqueueVideoJob({
       type: "recomputeVideoSignals",
       payload: videoId
         ? { videoId, reason: "manual-recompute" }
@@ -22,7 +22,11 @@ router.post("/queues/video/recompute", requireAdmin, async (req, res, next) => {
       requestedById: user?.id ?? null,
       videoId
     });
-    res.json(job);
+    res.status(202).json({
+      enqueued: true,
+      jobId: result.jobId,
+      mode: result.mode
+    });
   } catch (error) {
     next(error);
   }
