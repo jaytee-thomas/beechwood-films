@@ -1,5 +1,5 @@
 import pkg from "bullmq";
-const { Queue, QueueScheduler } = pkg;
+const { Queue } = pkg;
 import IORedis from "ioredis";
 import { getRedisConfig } from "../lib/redis.js";
 import {
@@ -14,7 +14,6 @@ import { bus } from "../lib/events.js";
 import { processVideoJob } from "../workers/processVideoJob.js";
 
 let queue = null;
-let scheduler = null;
 let mode = "inline";
 
 const defaultQueueOpts = {
@@ -46,7 +45,6 @@ export const getVideoQueue = () => {
     return null;
   }
   queue = new Queue("video", { connection, ...defaultQueueOpts });
-  scheduler = scheduler ?? new QueueScheduler("video", { connection });
   mode = "queue";
   return queue;
 };
