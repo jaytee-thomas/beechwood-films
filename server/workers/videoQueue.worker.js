@@ -26,8 +26,6 @@ const emit = (phase, payload) => {
   bus.emit("job:event", { phase, at: Date.now(), ...payload });
 };
 
-const startTimes = new Map();
-
 const worker = new Worker(
   "video",
   async (job) => {
@@ -49,12 +47,9 @@ const worker = new Worker(
       await job.updateProgress(progress);
     };
 
-    const startedAt = Date.now();
-    startTimes.set(meta.jobId, startedAt);
     const result = await processVideoJob(job, { onProgress: progressHandler });
-    await logCompleted({ jobId: meta.jobId, startedAt, result });
+    await logCompleted({ jobId: meta.jobId, result });
     emit("completed", { ...meta, result });
-    startTimes.delete(meta.jobId);
     return result;
   },
   {
@@ -73,9 +68,7 @@ worker.on("failed", async (job, err) => {
     requestedBy: job?.data?.requestedBy ?? null,
     requestedById: job?.data?.requestedById ?? null
   };
-  const startedAt = meta.jobId ? startTimes.get(meta.jobId) ?? null : null;
-  if (meta.jobId) startTimes.delete(meta.jobId);
-  await logFailed({ jobId: meta.jobId, startedAt, error: err });
+  await logFailed({ jobId: meta.jobId, error: err });
   emit("failed", { ...meta, error: err?.message || "unknown_error" });
   console.error("[videoQueue] job failed:", job?.id, err);
 });

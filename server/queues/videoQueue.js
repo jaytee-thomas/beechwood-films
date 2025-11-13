@@ -90,10 +90,11 @@ export const enqueueVideoJob = async ({
     const jobId = String(job.id);
     await logEnqueued({
       jobId,
-      jobType: type,
-      requestedBy,
-      requestedById,
+      queue: "video",
+      type,
       videoId,
+      actorEmail: requestedBy ?? null,
+      actorUserId: requestedById ?? null,
       payload: jobPayload
     });
     emitJobEvent("enqueued", { jobId, type, videoId, requestedBy, requestedById });
@@ -103,10 +104,11 @@ export const enqueueVideoJob = async ({
   const syntheticId = `inline:${Date.now()}`;
   await logEnqueued({
     jobId: syntheticId,
-    jobType: type,
-    requestedBy,
-    requestedById,
+    queue: "video",
+    type,
     videoId,
+    actorEmail: requestedBy ?? null,
+    actorUserId: requestedById ?? null,
     payload: jobPayload
   });
   await logStarted({ jobId: syntheticId, attempts: 1 });
@@ -137,7 +139,7 @@ export const enqueueVideoJob = async ({
       { id: syntheticId, name: type, data: jobPayload },
       { onProgress: progressHandler }
     );
-    await logCompleted({ jobId: syntheticId, startedAt, result });
+    await logCompleted({ jobId: syntheticId, result });
     emitJobEvent("completed", {
       jobId: syntheticId,
       type,
@@ -148,7 +150,7 @@ export const enqueueVideoJob = async ({
     });
     return { mode: "inline", jobId: syntheticId, result };
   } catch (error) {
-    await logFailed({ jobId: syntheticId, startedAt, error });
+    await logFailed({ jobId: syntheticId, error });
     emitJobEvent("failed", {
       jobId: syntheticId,
       type,

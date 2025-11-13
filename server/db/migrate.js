@@ -117,7 +117,8 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS idx_video_jobs_status_created ON video_jobs (status, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_video_jobs_type_created ON video_jobs (type, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_video_jobs_actor_email_created ON video_jobs (actor_email, created_at DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_video_jobs_job_id ON video_jobs (job_id)`
+  `CREATE INDEX IF NOT EXISTS idx_video_jobs_job_id ON video_jobs (job_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_video_jobs_job_id ON video_jobs (job_id)`
 ];
 
 // ===== MIGRATION EXECUTION =====

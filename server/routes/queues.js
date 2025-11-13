@@ -8,25 +8,21 @@ export const router = Router();
 
 router.post("/queues/video/recompute", requireAdmin, async (req, res, next) => {
   try {
-    const { id = null } = req.body || {};
     const user = req.auth?.session?.user;
-    const payload = {
-      id,
-      triggeredBy: user?.email ?? null,
-      ts: Date.now()
-    };
-    const result = await enqueueVideoJob({
+    const rawId = req.body?.id ?? null;
+    const videoId =
+      typeof rawId === "string" && rawId.trim().length > 0 ? rawId.trim() : null;
+
+    const job = await enqueueVideoJob({
       type: "recomputeVideoSignals",
-      payload,
-      requestedBy: user?.email,
-      requestedById: user?.id,
-      videoId: id
+      payload: videoId
+        ? { videoId, reason: "manual-recompute" }
+        : { reason: "manual-recompute" },
+      requestedBy: user?.email ?? null,
+      requestedById: user?.id ?? null,
+      videoId
     });
-    res.status(202).json({
-      enqueued: true,
-      jobId: result.jobId,
-      mode: result.mode
-    });
+    res.json(job);
   } catch (error) {
     next(error);
   }

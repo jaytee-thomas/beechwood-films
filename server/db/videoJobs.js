@@ -31,11 +31,12 @@ const serializeError = (error) => {
 
 export const logEnqueued = async ({
   jobId,
-  jobType,
-  requestedBy,
-  requestedById,
-  videoId,
-  payload,
+  queue = "video",
+  type,
+  videoId = null,
+  actorEmail = null,
+  actorUserId = null,
+  payload = null,
   maxRetries = Number(process.env.WEBHOOK_MAX_RETRIES || 3)
 }) => {
   await query(
@@ -44,37 +45,47 @@ export const logEnqueued = async ({
       job_id,
       queue,
       type,
-      payload,
+      status,
       actor_email,
       actor_user_id,
+      video_id,
       created_at,
+      attempts,
       max_retries,
-      tags,
-      status
+      payload
     )
     VALUES (
       $1,
       $2,
       $3,
-      $4::jsonb,
+      'queued',
+      $4,
       $5,
       $6,
       $7,
+      0,
       $8,
-      $9::jsonb,
-      'queued'
+      $9::jsonb
     )
+    ON CONFLICT (job_id) DO UPDATE
+      SET status = 'queued',
+          actor_email = EXCLUDED.actor_email,
+          actor_user_id = EXCLUDED.actor_user_id,
+          video_id = COALESCE(EXCLUDED.video_id, video_jobs.video_id),
+          payload = COALESCE(EXCLUDED.payload, video_jobs.payload),
+          max_retries = EXCLUDED.max_retries,
+          created_at = LEAST(video_jobs.created_at, EXCLUDED.created_at)
     `,
     [
       jobId,
-      "video",
-      jobType,
-      toJson(payload),
-      requestedBy ?? null,
-      requestedById ?? null,
+      queue,
+      type,
+      actorEmail,
+      actorUserId,
+      videoId,
       now(),
       maxRetries,
-      videoId ? JSON.stringify([String(videoId)]) : "[]"
+      toJson(payload)
     ]
   );
 };
@@ -109,26 +120,28 @@ export const logProgress = async ({ jobId, progress }) => {
   );
 };
 
-export const logCompleted = async ({ jobId, startedAt, result }) => {
+export const logCompleted = async ({ jobId, startedAt = null, result = null }) => {
   await query(
     `
     UPDATE video_jobs
        SET status = 'succeeded',
            finished_at = $2,
-           result = $3::jsonb
+           result = COALESCE($3::jsonb, result),
+           attempts = GREATEST(attempts, 1)
      WHERE job_id = $1
     `,
     [jobId, now(), result != null ? toJson(result, "null") : null]
   );
 };
 
-export const logFailed = async ({ jobId, startedAt, error }) => {
+export const logFailed = async ({ jobId, startedAt = null, error = null }) => {
   await query(
     `
     UPDATE video_jobs
        SET status = 'failed',
            finished_at = $2,
-           error = $3::jsonb
+           error = $3::jsonb,
+           attempts = attempts + 1
      WHERE job_id = $1
     `,
     [jobId, now(), serializeError(error)]
@@ -136,6 +149,7 @@ export const logFailed = async ({ jobId, startedAt, error }) => {
 };
 
 export const getRecent = async ({ limit = 50 } = {}) => {
+  const cappedLimit = Math.max(1, Number(limit) || 50);
   const { rows } = await query(
     `
     SELECT
@@ -154,7 +168,7 @@ export const getRecent = async ({ limit = 50 } = {}) => {
     ORDER BY COALESCE(finished_at, created_at) DESC
     LIMIT $1
     `,
-    [Math.max(1, Number(limit) || 50)]
+    [cappedLimit]
   );
   return rows;
 };
