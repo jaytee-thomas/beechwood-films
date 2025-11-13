@@ -619,7 +619,7 @@ function UploadModal({ open, onClose, onAdd }) {
                   }}
                   onClick={() => setLibrary("videos")}
                 >
-                  Vids
+                  Videos
                 </button>
                 <button
                   type='button'

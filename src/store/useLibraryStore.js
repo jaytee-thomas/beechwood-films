@@ -105,9 +105,15 @@ const useLibraryStore = create((set, get) => ({
     set({ loadingVideos: true, videosError: null });
     try {
       const data = await apiRequest("/api/videos");
-      const fromServer = Array.isArray(data?.videos) ? data.videos : [];
+      const fromServer = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.videos)
+        ? data.videos
+        : [];
       const videos = fromServer.length
-        ? fromServer.map((video) => ({
+        ? fromServer
+            .filter((video) => Boolean(video?.published))
+            .map((video) => ({
             ...video,
             id: Number(video.id) || video.id,
             src: video.src || video.embedUrl || "",

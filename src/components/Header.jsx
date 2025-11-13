@@ -8,7 +8,7 @@ const navLinks = [
   { to: "/", label: "Home" },
   { to: "/library", label: "Library" },
   { to: "/reels", label: "Reels" },
-  { to: "/vids", label: "Vids" },
+  { to: "/videos", label: "Videos" },
   { to: "/favorites", label: "Favorites" },
   { to: "/nsfw", label: "NSFW Classified" },
   { to: "/about", label: "Meet the Mind Behind Beechwood Films" },
