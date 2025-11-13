@@ -6,12 +6,21 @@ import { bus } from "../lib/events.js";
 
 export const router = Router();
 
+const isUuid = (value) => {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+};
+
 router.post("/queues/video/recompute", requireAdmin, async (req, res, next) => {
   try {
     const user = req.auth?.session?.user;
     const rawId = req.body?.id ?? null;
-    const videoId =
-      typeof rawId === "string" && rawId.trim().length > 0 ? rawId.trim() : null;
+    const trimmed = typeof rawId === "string" ? rawId.trim() : "";
+    const videoId = trimmed.length > 0 ? trimmed : null;
+
+    if (trimmed.length > 0 && !isUuid(trimmed)) {
+      return res.status(400).json({ error: "id must be a UUID or omitted" });
+    }
 
     const result = await enqueueVideoJob({
       type: "recomputeVideoSignals",
