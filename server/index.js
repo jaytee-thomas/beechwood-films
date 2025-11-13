@@ -34,6 +34,12 @@ const clientOrigins = (process.env.CLIENT_ORIGIN || "")
   .map(s => s.trim())
   .filter(Boolean);
 
+app.set("etag", false);
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 if (!clientOrigins.length && !isProduction) {
   clientOrigins.push("http://localhost:5173");
 }
