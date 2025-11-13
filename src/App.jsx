@@ -7,6 +7,7 @@ import Player from "./components/Player.jsx";
 import AdminPortals from "./components/AdminPortals.jsx";
 import useAuth from "./store/useAuth.js";
 import useLibraryStore from "./store/useLibraryStore.js";
+import { AdminJobsMonitor } from "./pages/AdminJobsMonitor.tsx";
 
 export default function App() {
   const [search, setSearch] = useState("");
@@ -44,6 +45,7 @@ export default function App() {
         <Route path='/reels' element={<Library mode='reels' search={search} />} />
         <Route path='/nsfw' element={<Library mode='nsfw' search={search} />} />
         <Route path='/watch/:id' element={<Player />} />
+        <Route path='/admin/jobs' element={<AdminJobsMonitor />} />
         <Route path='*' element={<Navigate to='/' replace />} />
       </Routes>
     </>
