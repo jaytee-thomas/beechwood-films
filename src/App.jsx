@@ -8,6 +8,7 @@ import AdminPortals from "./components/AdminPortals.jsx";
 import useAuth from "./store/useAuth.js";
 import useLibraryStore from "./store/useLibraryStore.js";
 import { AdminJobsMonitor } from "./pages/AdminJobsMonitor.tsx";
+import VideosLibrary from "./pages/VideosLibrary.jsx";
 
 export default function App() {
   const [search, setSearch] = useState("");
@@ -41,7 +42,7 @@ export default function App() {
         <Route path='/library' element={<Library mode='home' search={search} />} />
         <Route path='/about' element={<Library mode='about' search={search} />} />
         <Route path='/favorites' element={<Library mode='favorites' search={search} />} />
-        <Route path='/vids' element={<Library mode='vids' search={search} />} />
+        <Route path='/videos' element={<VideosLibrary />} />
         <Route path='/reels' element={<Library mode='reels' search={search} />} />
         <Route path='/nsfw' element={<Library mode='nsfw' search={search} />} />
         <Route path='/watch/:id' element={<Player />} />
