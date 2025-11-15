@@ -6,15 +6,11 @@ import { query } from "./pool.js";
  */
 export async function deleteSignalsForVideo(videoId) {
   if (!videoId) return;
-
-  await query(
-    `
-    DELETE FROM video_signals WHERE video_id = $1;
-    DELETE FROM video_scores WHERE video_id = $1;
-    DELETE FROM video_tag_signals WHERE video_id = $1;
-    `,
-    [videoId]
-  );
+  await Promise.all([
+    query(`DELETE FROM video_signals WHERE video_id = $1`, [videoId]),
+    query(`DELETE FROM video_scores WHERE video_id = $1`, [videoId]),
+    query(`DELETE FROM video_tag_signals WHERE video_id = $1`, [videoId])
+  ]);
 }
 
 /**
@@ -24,25 +20,28 @@ export async function deleteSignalsForVideo(videoId) {
 export async function insertVideoSignals(videoId, signals = []) {
   if (!videoId || !Array.isArray(signals) || signals.length === 0) return;
 
+  const rows = signals
+    .map((s) => ({
+      kind: s?.signalType ?? s?.kind ?? s?.type ?? null,
+      weight: Number.isFinite(s?.score) ? Number(s.score) : Number(s?.weight) || 0,
+      meta: s?.meta ?? {}
+    }))
+    .filter((row) => row.kind);
+
+  if (!rows.length) return;
+
   const now = Date.now();
   const values = [];
   const params = [];
 
-  signals.forEach((s, idx) => {
-    const base = idx * 4;
-    values.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`
-    );
-    params.push(
-      videoId,
-      s.signalType,
-      Number.isFinite(s.score) ? s.score : 0,
-      now
-    );
+  rows.forEach((row, idx) => {
+    const base = idx * 5;
+    values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`);
+    params.push(videoId, row.kind, row.weight, row.meta, now);
   });
 
   const sql = `
-    INSERT INTO video_signals (video_id, signal_type, score, created_at)
+    INSERT INTO video_signals (video_id, kind, weight, meta, created_at)
     VALUES ${values.join(", ")}
   `;
 
@@ -92,12 +91,12 @@ export async function upsertVideoScore(videoId, score) {
 
   await query(
     `
-    INSERT INTO video_scores (video_id, score, created_at)
+    INSERT INTO video_scores (video_id, score, last_recomputed_at)
     VALUES ($1, $2, $3)
     ON CONFLICT (video_id)
     DO UPDATE SET
       score = EXCLUDED.score,
-      created_at = EXCLUDED.created_at
+      last_recomputed_at = EXCLUDED.last_recomputed_at
     `,
     [videoId, numericScore, now]
   );
