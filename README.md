@@ -98,3 +98,4 @@ Persistent data lives in the SQLite database at `server/data/app.db` (created au
 - `curl https://api.yourdomain.com/health` to confirm liveness.
 - Sign in as admin on the Vercel site; ensure videos load, favorites sync, and uploads/notifications behave.
 - ⚠️ Before using file uploads, circle back to configure Cloudflare R2 (or S3) and update the AWS env vars in both environments; then test an upload end-to-end.
+// deploy trigger Sat Nov 15 04:09:43 CST 2025
