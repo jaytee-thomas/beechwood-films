@@ -1,91 +1,83 @@
-import { query } from "../db/pool.js";
+import { listVideos, getVideoById } from "../db/videos.pg.js";
+import {
+  deleteSignalsForVideo,
+  insertVideoSignals,
+  insertVideoTagSignals,
+  upsertVideoScore
+} from "../db/videoSignals.js";
 
-const toIntOrNull = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+const DEFAULT_BATCH_LIMIT = 500;
 
-const recomputeForVideoId = async (videoId, { onProgress } = {}) => {
-  if (!videoId) return { ok: true, updated: 0 };
+const normalizeString = (value) => (typeof value === "string" ? value : "");
+const normalizeTags = (value) =>
+  Array.isArray(value) ? value.filter((tag) => typeof tag === "string" && tag.trim().length > 0) : [];
 
-  onProgress?.(0.1);
-  const { rows } = await query(
-    `
-    SELECT
-      id,
-      title,
-      embed_url,
-      src,
-      provider,
-      provider_id,
-      thumbnail,
-      library,
-      source,
-      duration,
-      date,
-      description,
-      tags,
-      created_at,
-      updated_at,
-      file_name,
-      size_bytes,
-      width,
-      height,
-      status,
-      published,
-      preview_src,
-      s3_key,
-      r2_key
-    FROM videos
-    WHERE id = $1
-    `,
-    [videoId]
-  );
-  const current = rows[0];
-  if (!current) {
-    return { ok: true, updated: 0, note: "video not found" };
+export async function recomputeVideoSignals({ videoId } = {}, { logger } = {}) {
+  const log = logger || console;
+  let videos = [];
+
+  if (videoId) {
+    const video = await getVideoById(videoId);
+    if (!video) {
+      log.warn(`[recomputeVideoSignals] Video not found for id=${videoId}`);
+      return { ok: true, updated: 0, videoId, reason: "not-found" };
+    }
+    videos = [video];
+  } else {
+    const { items } = await listVideos({ page: 1, pageSize: DEFAULT_BATCH_LIMIT });
+    videos = items;
   }
 
-  onProgress?.(0.4);
-  const normalized = {
-    src: current.src || current.embed_url || null,
-    duration: current.duration ?? null,
-    width: toIntOrNull(current.width),
-    height: toIntOrNull(current.height)
-  };
+  for (const video of videos) {
+    if (!video) continue;
 
-  const updates = [];
-  const values = [];
-  const add = (sql, value) => {
-    updates.push(sql.replace("?", `$${values.length + 1}`));
-    values.push(value);
-  };
+    await deleteSignalsForVideo(video.id);
 
-  add("src = COALESCE(?, src)", normalized.src);
-  add("duration = COALESCE(?, duration)", normalized.duration);
-  add("width = COALESCE(?, width)", normalized.width);
-  add("height = COALESCE(?, height)", normalized.height);
-  add("updated_at = ?", Date.now());
-  values.push(videoId);
+    const title = normalizeString(video.title);
+    const description = normalizeString(video.description);
+    const tags = normalizeTags(video.tags);
 
-  onProgress?.(0.7);
-  const { rowCount } = await query(
-    `UPDATE videos SET ${updates.join(", ")} WHERE id = $${values.length}`,
-    values
-  );
+    const signals = [
+      { signalType: "has_embed_url", score: video.embedUrl ? 1 : 0 },
+      { signalType: "has_src", score: video.src ? 1 : 0 },
+      { signalType: "title_length", score: title.length },
+      { signalType: "description_length", score: description.length },
+      { signalType: "tag_count", score: tags.length }
+    ];
 
-  onProgress?.(0.9);
-  return { ok: true, updated: rowCount };
-};
+    const tagSignals = tags.map((tag) => ({ tag, weight: 1 }));
 
-export const processVideoJob = async (job, { onProgress } = {}) => {
-  const type = job?.name || "recomputeVideoSignals";
-  const { videoId = null } = job?.data || {};
+    if (signals.length) {
+      await insertVideoSignals(video.id, signals);
+    }
+    if (tagSignals.length) {
+      await insertVideoTagSignals(video.id, tagSignals);
+    }
 
-  switch (type) {
-    case "recomputeVideoSignals":
-      return recomputeForVideoId(videoId, { onProgress });
-    default:
-      return { ok: true, updated: 0, note: `unknown type: ${type}` };
+    const overallScore = tags.length * 1 + title.length * 0.01;
+    await upsertVideoScore(video.id, overallScore);
+
+    log.info(
+      `[recomputeVideoSignals] videoId=${video.id} tags=${tags.length} titleLen=${title.length} score=${overallScore.toFixed(
+        2
+      )}`
+    );
   }
-};
+
+  return { ok: true, updated: videos.length };
+}
+
+export async function processVideoJob(job, { logger } = {}) {
+  const type = job?.name || job?.type || "recomputeVideoSignals";
+  const payload = job?.data || job?.payload || {};
+
+  if (type !== "recomputeVideoSignals") {
+    (logger || console).warn(`[processVideoJob] Unknown job type: ${type}`);
+    return { ok: false, type, reason: "unknown-type" };
+  }
+
+  return recomputeVideoSignals(
+    { videoId: payload.videoId ?? payload.id ?? null },
+    { logger }
+  );
+}

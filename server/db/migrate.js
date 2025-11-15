@@ -75,6 +75,56 @@ const statements = [
     file_name TEXT
   )`,
 
+  // === VIDEO SIGNALS / SCORES / TAG SIGNALS ===
+  `
+  CREATE TABLE IF NOT EXISTS video_signals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    video_id UUID NOT NULL,
+    kind TEXT NOT NULL,
+    weight REAL NOT NULL DEFAULT 1,
+    meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at BIGINT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS video_signals_video_kind_idx
+    ON video_signals (video_id, kind);
+
+  CREATE INDEX IF NOT EXISTS video_signals_created_idx
+    ON video_signals (created_at DESC);
+  `,
+
+  `
+  CREATE TABLE IF NOT EXISTS video_scores (
+    video_id UUID PRIMARY KEY,
+    score REAL NOT NULL DEFAULT 0,
+    play_count BIGINT NOT NULL DEFAULT 0,
+    completion_count BIGINT NOT NULL DEFAULT 0,
+    like_count BIGINT NOT NULL DEFAULT 0,
+    bookmark_count BIGINT NOT NULL DEFAULT 0,
+    decay_factor REAL NOT NULL DEFAULT 1,
+    last_recomputed_at BIGINT
+  );
+
+  CREATE INDEX IF NOT EXISTS video_scores_score_idx
+    ON video_scores (score DESC);
+  `,
+
+  `
+  CREATE TABLE IF NOT EXISTS video_tag_signals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    video_id UUID NOT NULL,
+    tag TEXT NOT NULL,
+    weight REAL NOT NULL DEFAULT 1,
+    created_at BIGINT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS video_tag_signals_video_tag_idx
+    ON video_tag_signals (video_id, tag);
+
+  CREATE INDEX IF NOT EXISTS video_tag_signals_created_idx
+    ON video_tag_signals (created_at DESC);
+  `,
+
   // === VIDEO JOB AUDIT (queue/worker telemetry) ===
   `
   CREATE EXTENSION IF NOT EXISTS pgcrypto
