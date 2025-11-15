@@ -1,103 +1,174 @@
 // server/db/videoSignals.js
 import { query } from "./pool.js";
 
-/**
- * Wipe all signals/score rows for a given video.
- */
-export async function deleteSignalsForVideo(videoId) {
-  if (!videoId) return;
-  await Promise.all([
-    query(`DELETE FROM video_signals WHERE video_id = $1`, [videoId]),
-    query(`DELETE FROM video_scores WHERE video_id = $1`, [videoId]),
-    query(`DELETE FROM video_tag_signals WHERE video_id = $1`, [videoId])
-  ]);
+function nowMs() {
+  return Date.now();
 }
 
 /**
- * Bulk insert raw signals into video_signals.
- * signals: [ { signalType, score } ]
+ * Wipes existing signals for a single video so we can reinsert cleanly.
  */
-export async function insertVideoSignals(videoId, signals = []) {
-  if (!videoId || !Array.isArray(signals) || signals.length === 0) return;
-
-  const rows = signals
-    .map((s) => ({
-      kind: s?.signalType ?? s?.kind ?? s?.type ?? null,
-      weight: Number.isFinite(s?.score) ? Number(s.score) : Number(s?.weight) || 0,
-      meta: s?.meta ?? {}
-    }))
-    .filter((row) => row.kind);
-
-  if (!rows.length) return;
-
-  const now = Date.now();
-  const values = [];
-  const params = [];
-
-  rows.forEach((row, idx) => {
-    const base = idx * 5;
-    values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`);
-    params.push(videoId, row.kind, row.weight, row.meta, now);
-  });
-
-  const sql = `
-    INSERT INTO video_signals (video_id, kind, weight, meta, created_at)
-    VALUES ${values.join(", ")}
-  `;
-
-  await query(sql, params);
+async function clearSignalsForVideo(videoId) {
+  await query("DELETE FROM video_signals WHERE video_id = $1", [videoId]);
+  await query("DELETE FROM video_tag_signals WHERE video_id = $1", [videoId]);
+  await query("DELETE FROM video_scores WHERE video_id = $1", [videoId]);
 }
 
 /**
- * Bulk insert per-tag weights into video_tag_signals.
- * tagSignals: [ { tag, weight } ]
+ * Given a video row, compute simple signals from its tags.
+ * - 1 signal per tag: signal_type = "tag:<tag>", score = 1
+ * - 1 tag weight row per tag: weight = 1
+ * - overall video_scores.score = number of tags
  */
-export async function insertVideoTagSignals(videoId, tagSignals = []) {
-  if (!videoId || !Array.isArray(tagSignals) || tagSignals.length === 0) return;
+function buildSignalsForVideo(video) {
+  const createdAt = nowMs();
+  const videoId = video.id;
+  const tags = Array.isArray(video.tags) ? video.tags : [];
 
-  const now = Date.now();
-  const values = [];
-  const params = [];
+  const signalRows = [];
+  const tagRows = [];
+  let score = 0;
 
-  tagSignals.forEach((t, idx) => {
-    const base = idx * 4;
-    values.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`
-    );
-    params.push(
+  for (const raw of tags) {
+    const t = String(raw || "").trim();
+    if (!t) continue;
+
+    // tag signal
+    signalRows.push({
       videoId,
-      t.tag,
-      Number.isFinite(t.weight) ? t.weight : 1,
-      now
-    );
-  });
+      signalType: `tag:${t}`,
+      score: 1,
+      createdAt
+    });
 
-  const sql = `
-    INSERT INTO video_tag_signals (video_id, tag, weight, created_at)
-    VALUES ${values.join(", ")}
-  `;
+    // tag weight
+    tagRows.push({
+      videoId,
+      tag: t,
+      weight: 1,
+      createdAt
+    });
 
-  await query(sql, params);
+    score += 1;
+  }
+
+  return { signalRows, tagRows, score, createdAt };
 }
 
 /**
- * Upsert the main score per video into video_scores.
+ * Bulk insert helpers that match the ACTUAL schema:
+ *  - video_signals(video_id, signal_type, score, created_at)
+ *  - video_tag_signals(video_id, tag, weight, created_at)
+ *  - video_scores(video_id, score, created_at) with upsert
  */
-export async function upsertVideoScore(videoId, score) {
-  if (!videoId) return;
+async function insertSignalRows({ signalRows, tagRows, score, createdAt, videoId }) {
+  // video_signals
+  if (signalRows.length > 0) {
+    const values = [];
+    const params = [];
+    let i = 1;
 
-  const now = Date.now();
-  const numericScore = Number.isFinite(score) ? score : 0;
+    for (const row of signalRows) {
+      values.push(`($${i}, $${i + 1}, $${i + 2}, $${i + 3})`);
+      params.push(row.videoId, row.signalType, row.score, row.createdAt);
+      i += 4;
+    }
 
+    await query(
+      `
+        INSERT INTO video_signals (video_id, signal_type, score, created_at)
+        VALUES ${values.join(", ")}
+      `,
+      params
+    );
+  }
+
+  // video_tag_signals
+  if (tagRows.length > 0) {
+    const values = [];
+    const params = [];
+    let i = 1;
+
+    for (const row of tagRows) {
+      values.push(`($${i}, $${i + 1}, $${i + 2}, $${i + 3})`);
+      params.push(row.videoId, row.tag, row.weight, row.createdAt);
+      i += 4;
+    }
+
+    await query(
+      `
+        INSERT INTO video_tag_signals (video_id, tag, weight, created_at)
+        VALUES ${values.join(", ")}
+      `,
+      params
+    );
+  }
+
+  // video_scores – keep one row per video_id
+  const numericScore = Number(score) || 0;
   await query(
     `
-    INSERT INTO video_scores (video_id, score, last_recomputed_at)
-    VALUES ($1, $2, $3)
-    ON CONFLICT (video_id)
-    DO UPDATE SET
-      score = EXCLUDED.score,
-      last_recomputed_at = EXCLUDED.last_recomputed_at
+      INSERT INTO video_scores (video_id, score, created_at)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (video_id)
+      DO UPDATE SET
+        score = EXCLUDED.score,
+        created_at = EXCLUDED.created_at
     `,
-    [videoId, numericScore, now]
+    [videoId, numericScore, createdAt]
   );
+}
+
+/**
+ * Recompute signals for one video or all videos.
+ * Called from the queue worker via processVideoJob().
+ *
+ * data: { videoId?: string }
+ */
+export async function recomputeVideoSignals(data = {}) {
+  const { videoId } = data || {};
+
+  if (videoId) {
+    // single video
+    const { rows } = await query(
+      `
+        SELECT id, tags
+        FROM videos
+        WHERE id = $1
+      `,
+      [videoId]
+    );
+    if (!rows[0]) {
+      // nothing to do
+      return { processed: 0 };
+    }
+
+    const video = rows[0];
+
+    await clearSignalsForVideo(video.id);
+    const built = buildSignalsForVideo(video);
+    await insertSignalRows({ ...built, videoId: video.id });
+
+    return { processed: 1, videoId: video.id };
+  }
+
+  // batch mode: all videos
+  const { rows } = await query(
+    `
+      SELECT id, tags
+      FROM videos
+      WHERE published = TRUE
+    `
+  );
+
+  let processed = 0;
+
+  for (const video of rows) {
+    await clearSignalsForVideo(video.id);
+    const built = buildSignalsForVideo(video);
+    await insertSignalRows({ ...built, videoId: video.id });
+    processed += 1;
+  }
+
+  return { processed };
 }
