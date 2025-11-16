@@ -70,7 +70,8 @@ function mapRow(r) {
     published: r.published ?? false,
 
     s3Key: r.s3_key ?? null,
-    r2Key: r.r2_key ?? null
+    r2Key: r.r2_key ?? null,
+    score: toNumberOrNull(r.signal_score ?? r.score ?? 0)
   };
 }
 
@@ -102,23 +103,32 @@ function mapRow(r) {
  *  - r2_key TEXT
  */
 
-export async function listVideos({ page = 1, pageSize = 20 } = {}) {
+export async function listVideos({ page = 1, pageSize = 20, sort = "top" } = {}) {
   const limit = Math.max(1, Math.min(100, Number(pageSize) || 20));
   const offset = Math.max(0, (Number(page) || 1) - 1) * limit;
+
+  const normalizedSort = sort === "latest" ? "latest" : "top";
+  const orderBy =
+    normalizedSort === "latest"
+      ? "v.published DESC, v.created_at DESC"
+      : "COALESCE(vs.score, 0) DESC, v.created_at DESC";
 
   const { rows } = await query(
     `
     SELECT
-      id, title, embed_url, src,
-      provider, provider_id,
-      thumbnail, library, source,
-      duration, date, description,
-      tags, created_at, updated_at,
-      file_name, size_bytes, width, height,
-      status, published, preview_src,
-      s3_key, r2_key
-    FROM videos
-    ORDER BY published DESC, created_at DESC
+      v.id, v.title, v.embed_url, v.src,
+      v.provider, v.provider_id,
+      v.thumbnail, v.library, v.source,
+      v.duration, v.date, v.description,
+      v.tags, v.created_at, v.updated_at,
+      v.file_name, v.size_bytes, v.width, v.height,
+      v.status, v.published, v.preview_src,
+      v.s3_key, v.r2_key,
+      vs.score AS signal_score
+    FROM videos v
+    LEFT JOIN video_scores vs ON vs.video_id = v.id
+    WHERE v.published = TRUE
+    ORDER BY ${orderBy}
     LIMIT $1 OFFSET $2
     `,
     [limit, offset]
@@ -135,20 +145,101 @@ export async function getVideoById(id) {
   const { rows } = await query(
     `
     SELECT
-      id, title, embed_url, src,
-      provider, provider_id,
-      thumbnail, library, source,
-      duration, date, description,
-      tags, created_at, updated_at,
-      file_name, size_bytes, width, height,
-      status, published, preview_src,
-      s3_key, r2_key
-    FROM videos
-    WHERE id = $1
+      v.id, v.title, v.embed_url, v.src,
+      v.provider, v.provider_id,
+      v.thumbnail, v.library, v.source,
+      v.duration, v.date, v.description,
+      v.tags, v.created_at, v.updated_at,
+      v.file_name, v.size_bytes, v.width, v.height,
+      v.status, v.published, v.preview_src,
+      v.s3_key, v.r2_key,
+      vs.score AS signal_score
+    FROM videos v
+    LEFT JOIN video_scores vs ON vs.video_id = v.id
+    WHERE v.id = $1
     `,
     [id]
   );
   return mapRow(rows[0] || null);
+}
+
+export async function getRelatedVideosFor(videoId, { limit = 10 } = {}) {
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 10));
+
+  const { rows } = await query(
+    `
+    WITH base_tags AS (
+      SELECT vts.tag
+      FROM video_tag_signals vts
+      WHERE vts.video_id = $1
+    ),
+    scored AS (
+      SELECT
+        v.id,
+        v.title,
+        v.embed_url,
+        v.src,
+        v.provider,
+        v.provider_id,
+        v.thumbnail,
+        v.library,
+        v.source,
+        v.duration,
+        v.date,
+        v.description,
+        v.tags,
+        v.created_at,
+        v.updated_at,
+        v.file_name,
+        v.size_bytes,
+        v.width,
+        v.height,
+        v.status,
+        v.published,
+        v.preview_src,
+        v.s3_key,
+        v.r2_key,
+        COUNT(*) AS overlap_count
+      FROM video_tag_signals vts
+      JOIN base_tags bt ON bt.tag = vts.tag
+      JOIN videos v ON v.id = vts.video_id
+      WHERE v.id <> $1
+        AND v.published = TRUE
+      GROUP BY
+        v.id,
+        v.title,
+        v.embed_url,
+        v.src,
+        v.provider,
+        v.provider_id,
+        v.thumbnail,
+        v.library,
+        v.source,
+        v.duration,
+        v.date,
+        v.description,
+        v.tags,
+        v.created_at,
+        v.updated_at,
+        v.file_name,
+        v.size_bytes,
+        v.width,
+        v.height,
+        v.status,
+        v.published,
+        v.preview_src,
+        v.s3_key,
+        v.r2_key
+    )
+    SELECT *
+    FROM scored
+    ORDER BY overlap_count DESC, created_at DESC
+    LIMIT $2
+    `,
+    [videoId, safeLimit]
+  );
+
+  return rows.map(mapRow);
 }
 
 export async function insertVideo(input = {}) {

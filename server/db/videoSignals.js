@@ -5,12 +5,6 @@ function nowMs() {
   return Date.now();
 }
 
-const TAG_WEIGHTS = {
-  featured: 5,
-  reel: 3,
-  beechwood: 2
-};
-
 /**
  * Wipes existing signals for a single video so we can reinsert cleanly.
  */
@@ -38,14 +32,12 @@ function buildSignalsForVideo(video) {
   for (const raw of tags) {
     const t = String(raw || "").trim();
     if (!t) continue;
-    const key = t.toLowerCase();
-    const weight = TAG_WEIGHTS[key] ?? 1;
 
     // tag signal
     signalRows.push({
       videoId,
       signalType: `tag:${t}`,
-      score: weight,
+      score: 1,
       createdAt
     });
 
@@ -53,11 +45,11 @@ function buildSignalsForVideo(video) {
     tagRows.push({
       videoId,
       tag: t,
-      weight,
+      weight: 1,
       createdAt
     });
 
-    score += weight;
+    score += 1;
   }
 
   return { signalRows, tagRows, score, createdAt };
@@ -134,8 +126,7 @@ async function insertSignalRows({ signalRows, tagRows, score, createdAt, videoId
  * data: { videoId?: string }
  */
 export async function recomputeVideoSignals(data = {}) {
-  console.log("[signals] recomputeVideoSignals called with:", data);
-  const { videoId } = data || {};
+  const videoId = data?.videoId ? String(data.videoId).trim() : "";
 
   if (videoId) {
     // single video
@@ -158,7 +149,6 @@ export async function recomputeVideoSignals(data = {}) {
     const built = buildSignalsForVideo(video);
     await insertSignalRows({ ...built, videoId: video.id });
 
-    console.log("[signals] recomputeVideoSignals done – processed = 1 (single)");
     return { processed: 1, videoId: video.id };
   }
 
@@ -180,145 +170,24 @@ export async function recomputeVideoSignals(data = {}) {
     processed += 1;
   }
 
-  console.log("[signals] recomputeVideoSignals done – processed =", processed);
   return { processed };
-}
-
-export async function getSignalsForVideo(videoId) {
-  const { rows: scoreRows } = await query(
-    `
-      SELECT video_id, score, created_at
-      FROM video_scores
-      WHERE video_id = $1
-    `,
-    [videoId]
-  );
-
-  const baseScore = scoreRows[0] || null;
-
-  const { rows: signalRows } = await query(
-    `
-      SELECT video_id, signal_type, score, created_at
-      FROM video_signals
-      WHERE video_id = $1
-      ORDER BY created_at DESC
-    `,
-    [videoId]
-  );
-
-  const { rows: tagRows } = await query(
-    `
-      SELECT video_id, tag, weight, created_at
-      FROM video_tag_signals
-      WHERE video_id = $1
-      ORDER BY created_at DESC
-    `,
-    [videoId]
-  );
-
-  return {
-    score: baseScore
-      ? {
-          videoId: baseScore.video_id,
-          score: Number(baseScore.score) || 0,
-          createdAt: baseScore.created_at
-        }
-      : null,
-    signals: signalRows.map((r) => ({
-      videoId: r.video_id,
-      type: r.signal_type,
-      score: Number(r.score) || 0,
-      createdAt: r.created_at
-    })),
-    tagSignals: tagRows.map((r) => ({
-      videoId: r.video_id,
-      tag: r.tag,
-      weight: Number(r.weight) || 0,
-      createdAt: r.created_at
-    }))
-  };
-}
-
-export async function getRelatedVideos(videoId, { limit = 6 } = {}) {
-  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 6));
-  const { rows } = await query(
-    `
-      WITH target_tags AS (
-        SELECT tag, weight
-        FROM video_tag_signals
-        WHERE video_id = $1
-      )
-      SELECT
-        v.id,
-        v.title,
-        v.embed_url,
-        v.src,
-        v.provider,
-        v.provider_id,
-        v.thumbnail,
-        v.library,
-        v.source,
-        v.duration,
-        v.date,
-        v.description,
-        v.tags,
-        v.created_at,
-        v.updated_at,
-        v.file_name,
-        v.size_bytes,
-        v.width,
-        v.height,
-        v.status,
-        v.published,
-        v.preview_src,
-        v.s3_key,
-        v.r2_key,
-        COALESCE(SUM(t.weight), 0) AS related_score
-      FROM target_tags t
-      JOIN video_tag_signals vts
-        ON vts.tag = t.tag
-      JOIN videos v
-        ON v.id = vts.video_id
-      WHERE v.id <> $1
-        AND v.published = TRUE
-      GROUP BY
-        v.id, v.title, v.embed_url, v.src,
-        v.provider, v.provider_id,
-        v.thumbnail, v.library, v.source,
-        v.duration, v.date, v.description,
-        v.tags, v.created_at, v.updated_at,
-        v.file_name, v.size_bytes, v.width, v.height,
-        v.status, v.published, v.preview_src,
-        v.s3_key, v.r2_key
-      ORDER BY related_score DESC, v.created_at DESC
-      LIMIT $2
-    `,
-    [videoId, safeLimit]
-  );
-
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    embedUrl: r.embed_url ?? null,
-    src: r.src ?? null,
-    provider: r.provider ?? "custom",
-    providerId: r.provider_id ?? null,
-    thumbnail: r.thumbnail ?? null,
-    library: r.library ?? null,
-    source: r.source ?? null,
-    duration: r.duration ?? null,
-    description: r.description ?? null,
-    tags: Array.isArray(r.tags) ? r.tags : [],
-    createdAt: r.created_at ?? null,
-    relatedScore: Number(r.related_score) || 0
-  }));
 }
 
 // ======================================================================
 // Read helpers for API
 // ======================================================================
 
-export async function getVideoSignalsForVideo(videoId) {
+function normalizeId(maybeId) {
+  const v = String(maybeId ?? "").trim();
+  if (!v || v === "null" || v === "undefined") return null;
+  return v;
+}
+
+/**
+ * Return signals + tag weights + score for a single video.
+ */
+export async function getVideoSignalsForVideo(videoIdInput) {
+  const videoId = normalizeId(videoIdInput);
   if (!videoId) return null;
 
   const [signalsRes, tagsRes, scoreRes] = await Promise.all([
@@ -353,30 +222,34 @@ export async function getVideoSignalsForVideo(videoId) {
 
   const scoreRow = scoreRes.rows[0] || null;
 
+  // If nothing at all, let the route 404
   if (!signalsRes.rows.length && !tagsRes.rows.length && !scoreRow) {
     return null;
   }
 
   return {
     videoId,
-    score: scoreRow ? Number(scoreRow.score) || 0 : 0,
+    score: scoreRow ? scoreRow.score : 0,
     scoreCreatedAt: scoreRow ? scoreRow.created_at : null,
     signals: signalsRes.rows.map((r) => ({
       type: r.signal_type,
-      score: Number(r.score) || 0,
+      score: r.score,
       createdAt: r.created_at
     })),
     tags: tagsRes.rows.map((r) => ({
       tag: r.tag,
-      weight: Number(r.weight) || 0,
+      weight: r.weight,
       createdAt: r.created_at
     }))
   };
 }
 
-export async function getRelatedVideosForVideo(videoId, { limit = 8 } = {}) {
+/**
+ * Very simple "related videos" based on overlapping tags.
+ */
+export async function getRelatedVideosForVideo(videoIdInput, { limit = 8 } = {}) {
+  const videoId = normalizeId(videoIdInput);
   if (!videoId) return [];
-  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 8));
 
   const { rows } = await query(
     `
@@ -399,7 +272,7 @@ export async function getRelatedVideosForVideo(videoId, { limit = 8 } = {}) {
       ORDER BY overlap_tags DESC, score DESC, created_at DESC
       LIMIT $2
     `,
-    [videoId, safeLimit]
+    [videoId, limit]
   );
 
   return rows.map((r) => ({
