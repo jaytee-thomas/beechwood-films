@@ -80,16 +80,18 @@ const statements = [
   CREATE TABLE IF NOT EXISTS video_signals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     video_id UUID NOT NULL,
-    kind TEXT NOT NULL,
-    weight REAL NOT NULL DEFAULT 1,
-    meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+    signal_type TEXT NOT NULL,
+    score REAL NOT NULL DEFAULT 0,
     created_at BIGINT NOT NULL
   );
 
-  CREATE INDEX IF NOT EXISTS video_signals_video_kind_idx
-    ON video_signals (video_id, kind);
+  CREATE INDEX IF NOT EXISTS video_signals_video_signal_type_idx
+    ON video_signals (video_id, signal_type);
 
-  CREATE INDEX IF NOT EXISTS video_signals_created_idx
+  CREATE INDEX IF NOT EXISTS video_signals_video_id_idx
+    ON video_signals (video_id);
+
+  CREATE INDEX IF NOT EXISTS video_signals_created_at_idx
     ON video_signals (created_at DESC);
   `,
 
