@@ -1,32 +1,30 @@
 const API_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
-  "https://api.beechwoodfilms.org";
+  (typeof import.meta !== "undefined" &&
+    import.meta.env?.VITE_API_ORIGIN?.replace(/\/+$/, "")) ||
+  "";
 
-async function getJson(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
-  });
+function apiUrl(path) {
+  if (API_BASE) return `${API_BASE}${path}`;
+  return path;
+}
 
+async function handleJson(res) {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("API error", res.status, path, text);
-    throw new Error(`API ${path} failed with status ${res.status}`);
+    throw new Error(`API error ${res.status}: ${res.statusText || text || "Unknown error"}`);
   }
-
   return res.json();
 }
 
 export async function fetchVideoSignals(id) {
   if (!id) throw new Error("fetchVideoSignals: id is required");
-  return getJson(`/api/videos/${id}/signals`);
+  const res = await fetch(apiUrl(`/api/videos/${id}/signals`));
+  if (res.status === 404) return null;
+  return handleJson(res);
 }
 
 export async function fetchRelatedVideos(id) {
   if (!id) throw new Error("fetchRelatedVideos: id is required");
-  return getJson(`/api/videos/${id}/related`);
+  const res = await fetch(apiUrl(`/api/videos/${id}/related`));
+  return handleJson(res);
 }

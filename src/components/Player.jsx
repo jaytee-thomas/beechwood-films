@@ -643,76 +643,91 @@ useEffect(() => {
                   </section>
                 )}
 
-                {(signalsData || relatedFromApi.length > 0) && (
-                  <section className='bf-signalRelatedSection'>
-                    <div className='bf-signalsPanel'>
-                      <h3>Signals</h3>
-                      {loadingSignals && <p>Loading signals…</p>}
-                      {signalsError && <p className='bf-error'>{signalsError}</p>}
-                      {!loadingSignals && !signalsData && !signalsError && (
-                        <p>No signals yet.</p>
-                      )}
-                      {signalsData && (
-                        <>
-                          <p>
-                            <strong>Score:</strong> {signalsData.score ?? 0}
-                          </p>
-                          {signalsData.signals?.length > 0 && (
-                            <>
-                              <h4>Tag Signals</h4>
-                              <ul>
-                                {signalsData.signals.map((sig) => (
-                                  <li key={`${sig.type}-${sig.createdAt}`}>
-                                    {sig.type} · {sig.score}
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                          {signalsData.tags?.length > 0 && (
-                            <>
-                              <h4>Tag Weights</h4>
-                              <ul>
-                                {signalsData.tags.map((tag) => (
-                                  <li key={`${tag.tag}-${tag.createdAt}`}>
-                                    {tag.tag} · {tag.weight}
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    <div className='bf-relatedPanel'>
-                      <h3>Related videos</h3>
-                      {loadingRelated && <p>Loading related…</p>}
-                      {relatedError && <p className='bf-error'>{relatedError}</p>}
-                      {!loadingRelated &&
-                        !relatedError &&
-                        relatedFromApi.length === 0 && (
-                          <p>No related videos yet.</p>
+                <div className='player-insights'>
+                  <section className='player-signals'>
+                    <h3>Signals</h3>
+                    {loadingSignals && <p className='muted'>Loading signals…</p>}
+                    {!loadingSignals && signalsError && (
+                      <p className='error-text'>{signalsError}</p>
+                    )}
+                    {!loadingSignals && !signalsError && !signalsData && (
+                      <p className='muted'>No signals yet for this video.</p>
+                    )}
+                    {!loadingSignals && signalsData && (
+                      <>
+                        <div className='signals-score-row'>
+                          <span className='signals-score-label'>Signal score</span>
+                          <span className='signals-score-pill'>
+                            {signalsData.score ?? 0}
+                          </span>
+                        </div>
+                        {signalsData.tagSignals?.length > 0 && (
+                          <div className='signals-tags'>
+                            <h4>Tag signals</h4>
+                            <div className='signals-tag-chips'>
+                              {signalsData.tagSignals.map((tag) => (
+                                <span key={`${tag.tag}-${tag.created_at}`} className='signal-chip'>
+                                  {tag.tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                      <ul>
+                        {signalsData.signals?.length > 0 && (
+                          <div className='signals-raw'>
+                            <h4>Raw signals</h4>
+                            <ul>
+                              {signalsData.signals.map((sig, idx) => (
+                                <li key={idx}>
+                                  <span className='signal-type'>{sig.signal_type || sig.type}</span>
+                                  <span className='signal-score'>× {sig.score}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </section>
+
+                  <section className='player-related'>
+                    <h3>Related videos</h3>
+                    {loadingRelated && <p className='muted'>Finding related videos…</p>}
+                    {!loadingRelated && relatedError && (
+                      <p className='error-text'>{relatedError}</p>
+                    )}
+                    {!loadingRelated &&
+                      !relatedError &&
+                      (!relatedFromApi || relatedFromApi.length === 0) && (
+                        <p className='muted'>No related videos yet.</p>
+                      )}
+                    {!loadingRelated && relatedFromApi.length > 0 && (
+                      <ul className='related-list'>
                         {relatedFromApi.map((item) => (
-                          <li key={item.id}>
-                            <button
-                              type='button'
-                              className='bf-relatedBtn'
-                              onClick={() => playVideoById({ id: item.id })}
-                            >
-                              {item.title}
-                              <span className='bf-relatedMeta'>
-                                score {item.score ?? 0} · tags {item.overlapTags ?? 0}
-                              </span>
-                            </button>
+                          <li
+                            key={item.id}
+                            className='related-item'
+                            onClick={() => playVideoById({ id: item.id })}
+                          >
+                            <div className='related-main'>
+                              <span className='related-title'>{item.title}</span>
+                              {item.score != null && (
+                                <span className='related-score-pill'>score {item.score}</span>
+                              )}
+                            </div>
+                            {item.tag_overlap_count && (
+                              <div className='related-meta'>
+                                <span className='muted'>
+                                  shared tags: {item.tag_overlap_count}
+                                </span>
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
-                    </div>
+                    )}
                   </section>
-                )}
+                </div>
               </>
             )}
           </div>

@@ -3550,3 +3550,143 @@ body {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.5);
 }
+.player-insights {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.player-signals,
+.player-related {
+  background: radial-gradient(circle at top left, rgba(23, 25, 44, 0.92), rgba(9, 11, 20, 0.9));
+  border-radius: 18px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.player-signals h3,
+.player-related h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(253, 253, 255, 0.65);
+}
+
+.signals-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.signals-score-label {
+  font-size: 0.8rem;
+  color: rgba(245, 245, 255, 0.7);
+}
+
+.signals-score-pill {
+  font-size: 0.82rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(34, 197, 204, 0.12);
+  color: rgba(190, 247, 250, 0.9);
+}
+
+.signals-tags h4,
+.signals-raw h4 {
+  font-size: 0.78rem;
+  margin: 0.4rem 0 0.25rem;
+  color: rgba(226, 232, 255, 0.8);
+}
+
+.signals-tag-chips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.signal-chip {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.signals-raw ul,
+.related-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.signals-raw li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.signals-raw li:last-child {
+  border-bottom: none;
+}
+
+.signal-type {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.signal-score {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.related-list {
+  margin-top: 0.4rem;
+}
+
+.related-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.related-item:last-child {
+  border-bottom: none;
+}
+
+.related-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.related-title {
+  font-size: 0.85rem;
+}
+
+.related-score-pill {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.related-meta {
+  margin-top: 0.2rem;
+}
+
+.muted {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.error-text {
+  font-size: 0.8rem;
+  color: #fb7185;
+}
