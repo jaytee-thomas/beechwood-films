@@ -111,7 +111,7 @@ export async function listVideos({ page = 1, pageSize = 20, sort = "top" } = {})
   const orderBy =
     normalizedSort === "latest"
       ? "v.published DESC, v.created_at DESC"
-      : "COALESCE(vs.score, 0) DESC, v.created_at DESC";
+      : "COALESCE(vs.score, 0) DESC, v.published DESC, v.created_at DESC";
 
   const { rows } = await query(
     `

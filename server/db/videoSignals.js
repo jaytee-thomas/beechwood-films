@@ -172,3 +172,52 @@ export async function recomputeVideoSignals(data = {}) {
 
   return { processed };
 }
+
+export async function getVideoSignalsForVideo(videoId) {
+  if (!videoId) return null;
+
+  const [scoreRes, signalsRes, tagsRes] = await Promise.all([
+    query(
+      `
+        SELECT video_id, score, created_at
+        FROM video_scores
+        WHERE video_id = $1
+      `,
+      [videoId]
+    ),
+    query(
+      `
+        SELECT video_id, signal_type, score, created_at
+        FROM video_signals
+        WHERE video_id = $1
+        ORDER BY created_at DESC
+      `,
+      [videoId]
+    ),
+    query(
+      `
+        SELECT video_id, tag, weight, created_at
+        FROM video_tag_signals
+        WHERE video_id = $1
+        ORDER BY weight DESC, tag ASC
+      `,
+      [videoId]
+    )
+  ]);
+
+  const scoreRow = scoreRes.rows[0] || null;
+  const signals = signalsRes.rows || [];
+  const tagSignals = tagsRes.rows || [];
+
+  if (!scoreRow && signals.length === 0 && tagSignals.length === 0) {
+    return null;
+  }
+
+  return {
+    videoId,
+    score: scoreRow ? Number(scoreRow.score) || 0 : 0,
+    scoreCreatedAt: scoreRow ? scoreRow.created_at : null,
+    signals,
+    tagSignals
+  };
+}

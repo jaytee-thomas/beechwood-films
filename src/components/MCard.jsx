@@ -26,6 +26,7 @@ export default function MCard({
   const hasStats = Boolean(stats && (stats.views || stats.age));
   const cardVariant = `${baseVariant}${hasStats ? " m-card--has-stats" : ""}`;
   const showShare = hasStats && !isPlaceholder;
+  const showScore = typeof video.score === "number" && !Number.isNaN(video.score);
 
   const previewSrc = video.previewSrc || video.src;
   const canPreview = Boolean(previewSrc) && !isPlaceholder;
@@ -164,6 +165,9 @@ export default function MCard({
               <span>{duration || "--"}</span>
             </div>
           )
+        )}
+        {showScore && (
+          <span className='m-card__scorePill'>score {Number(video.score).toFixed(0)}</span>
         )}
       </footer>
     </article>
