@@ -11,10 +11,7 @@ import {
   getVideoById,
   getRelatedVideosFor
 } from "../db/videos.js";
-import {
-  getVideoSignalsForVideo,
-  getRelatedVideosForVideo
-} from "../db/videoSignals.js";
+import { getVideoSignalsForVideo } from "../db/videoSignals.js";
 
 const router = Router();
 
@@ -160,7 +157,8 @@ router.get("/:id/signals", async (req, res, next) => {
 router.get("/:id/related", async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const items = await getRelatedVideosForVideo(id, { limit: 8 });
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
+    const items = await getRelatedVideosFor(id, limit);
     res.json({ videoId: id, items });
   } catch (err) {
     dbg("GET /:id/related -> error", err);

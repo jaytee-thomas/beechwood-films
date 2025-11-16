@@ -6,6 +6,7 @@ import useAdminPanel from "../store/useAdminPanel";
 import Header from "./Header";
 import MCard from "./MCard.jsx";
 import { isDashSource, isHlsSource } from "../utils/streaming.js";
+import { fetchVideoSignals, fetchRelatedVideos } from "../api/videos.js";
 
 const VIDEO_MIME_TYPES = {
   mp4: "video/mp4",
@@ -95,6 +96,12 @@ export default function Player() {
     () => videos.find((v) => String(v.id) === String(id)),
     [videos, id]
   );
+  const [signalsData, setSignalsData] = useState(null);
+  const [relatedFromApi, setRelatedFromApi] = useState([]);
+  const [loadingSignals, setLoadingSignals] = useState(false);
+  const [loadingRelated, setLoadingRelated] = useState(false);
+  const [signalsError, setSignalsError] = useState(null);
+  const [relatedError, setRelatedError] = useState(null);
 
   const provider = (video?.provider || "").toLowerCase();
   const isYouTube = provider === "youtube";
@@ -110,9 +117,55 @@ export default function Player() {
     isVimeo && video?.embedUrl ? `${video.embedUrl}?autoplay=1` : null;
 
   // record that this video was watched (for recency)
+useEffect(() => {
+  if (video) recordWatch(video.id);
+}, [video, recordWatch]);
+
   useEffect(() => {
-    if (video) recordWatch(video.id);
-  }, [video, recordWatch]);
+    if (!video?.id) {
+      setSignalsData(null);
+      setRelatedFromApi([]);
+      setSignalsError(null);
+      setRelatedError(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setSignalsError(null);
+      setLoadingSignals(true);
+      try {
+        const data = await fetchVideoSignals(video.id);
+        if (!cancelled) setSignalsData(data);
+      } catch (err) {
+        console.error("Failed to load video signals", err);
+        if (!cancelled) {
+          setSignalsData(null);
+          setSignalsError("Could not load signals");
+        }
+      } finally {
+        if (!cancelled) setLoadingSignals(false);
+      }
+
+      setRelatedError(null);
+      setLoadingRelated(true);
+      try {
+        const rel = await fetchRelatedVideos(video.id);
+        if (!cancelled) setRelatedFromApi(rel?.items || []);
+      } catch (err) {
+        console.error("Failed to load related videos", err);
+        if (!cancelled) {
+          setRelatedFromApi([]);
+          setRelatedError("Could not load related videos");
+        }
+      } finally {
+        if (!cancelled) setLoadingRelated(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [video?.id]);
 
   // --- Save progress for file videos ---
   const videoRef = useRef(null);
@@ -586,6 +639,77 @@ export default function Player() {
                           </div>
                         );
                       })}
+                    </div>
+                  </section>
+                )}
+
+                {(signalsData || relatedFromApi.length > 0) && (
+                  <section className='bf-signalRelatedSection'>
+                    <div className='bf-signalsPanel'>
+                      <h3>Signals</h3>
+                      {loadingSignals && <p>Loading signals…</p>}
+                      {signalsError && <p className='bf-error'>{signalsError}</p>}
+                      {!loadingSignals && !signalsData && !signalsError && (
+                        <p>No signals yet.</p>
+                      )}
+                      {signalsData && (
+                        <>
+                          <p>
+                            <strong>Score:</strong> {signalsData.score ?? 0}
+                          </p>
+                          {signalsData.signals?.length > 0 && (
+                            <>
+                              <h4>Tag Signals</h4>
+                              <ul>
+                                {signalsData.signals.map((sig) => (
+                                  <li key={`${sig.type}-${sig.createdAt}`}>
+                                    {sig.type} · {sig.score}
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                          {signalsData.tags?.length > 0 && (
+                            <>
+                              <h4>Tag Weights</h4>
+                              <ul>
+                                {signalsData.tags.map((tag) => (
+                                  <li key={`${tag.tag}-${tag.createdAt}`}>
+                                    {tag.tag} · {tag.weight}
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className='bf-relatedPanel'>
+                      <h3>Related videos</h3>
+                      {loadingRelated && <p>Loading related…</p>}
+                      {relatedError && <p className='bf-error'>{relatedError}</p>}
+                      {!loadingRelated &&
+                        !relatedError &&
+                        relatedFromApi.length === 0 && (
+                          <p>No related videos yet.</p>
+                        )}
+                      <ul>
+                        {relatedFromApi.map((item) => (
+                          <li key={item.id}>
+                            <button
+                              type='button'
+                              className='bf-relatedBtn'
+                              onClick={() => playVideoById({ id: item.id })}
+                            >
+                              {item.title}
+                              <span className='bf-relatedMeta'>
+                                score {item.score ?? 0} · tags {item.overlapTags ?? 0}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </section>
                 )}
