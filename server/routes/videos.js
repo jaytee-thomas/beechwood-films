@@ -8,8 +8,13 @@ import {
   insertVideo,
   updateVideo,
   deleteVideo,
-  getVideoById
+  getVideoById,
+  getRelatedVideosFor
 } from "../db/videos.js";
+import {
+  getVideoSignalsForVideo,
+  getRelatedVideosForVideo
+} from "../db/videoSignals.js";
 
 const router = Router();
 
@@ -96,7 +101,8 @@ router.get("/", async (req, res, next) => {
   try {
     const page = Math.max(1, Number(req.query.page || 1));
     const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize || 20)));
-    const out = await listVideos({ page, pageSize });
+    const sort = req.query.sort === "latest" ? "latest" : "top";
+    const out = await listVideos({ page, pageSize, sort });
     // Ensure consistent envelope
     if (Array.isArray(out)) {
       return res.json({ items: out, page, pageSize });
@@ -132,6 +138,32 @@ router.get("/:id", async (req, res, next) => {
     res.json({ video });
   } catch (err) {
     dbg("GET /:id -> error", err);
+    next(err);
+  }
+});
+
+router.get("/:id/signals", async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const data = await getVideoSignalsForVideo(id);
+    if (!data) {
+      return res.status(404).json({ error: "Signals not found for this video" });
+    }
+    res.json(data);
+  } catch (err) {
+    dbg("GET /:id/signals -> error", err);
+    next(err);
+  }
+});
+
+// RELATED
+router.get("/:id/related", async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const items = await getRelatedVideosForVideo(id, { limit: 8 });
+    res.json({ videoId: id, items });
+  } catch (err) {
+    dbg("GET /:id/related -> error", err);
     next(err);
   }
 });

@@ -5,6 +5,12 @@ function nowMs() {
   return Date.now();
 }
 
+const TAG_WEIGHTS = {
+  featured: 5,
+  reel: 3,
+  beechwood: 2
+};
+
 /**
  * Wipes existing signals for a single video so we can reinsert cleanly.
  */
@@ -32,12 +38,14 @@ function buildSignalsForVideo(video) {
   for (const raw of tags) {
     const t = String(raw || "").trim();
     if (!t) continue;
+    const key = t.toLowerCase();
+    const weight = TAG_WEIGHTS[key] ?? 1;
 
     // tag signal
     signalRows.push({
       videoId,
       signalType: `tag:${t}`,
-      score: 1,
+      score: weight,
       createdAt
     });
 
@@ -45,11 +53,11 @@ function buildSignalsForVideo(video) {
     tagRows.push({
       videoId,
       tag: t,
-      weight: 1,
+      weight,
       createdAt
     });
 
-    score += 1;
+    score += weight;
   }
 
   return { signalRows, tagRows, score, createdAt };
@@ -174,4 +182,230 @@ export async function recomputeVideoSignals(data = {}) {
 
   console.log("[signals] recomputeVideoSignals done – processed =", processed);
   return { processed };
+}
+
+export async function getSignalsForVideo(videoId) {
+  const { rows: scoreRows } = await query(
+    `
+      SELECT video_id, score, created_at
+      FROM video_scores
+      WHERE video_id = $1
+    `,
+    [videoId]
+  );
+
+  const baseScore = scoreRows[0] || null;
+
+  const { rows: signalRows } = await query(
+    `
+      SELECT video_id, signal_type, score, created_at
+      FROM video_signals
+      WHERE video_id = $1
+      ORDER BY created_at DESC
+    `,
+    [videoId]
+  );
+
+  const { rows: tagRows } = await query(
+    `
+      SELECT video_id, tag, weight, created_at
+      FROM video_tag_signals
+      WHERE video_id = $1
+      ORDER BY created_at DESC
+    `,
+    [videoId]
+  );
+
+  return {
+    score: baseScore
+      ? {
+          videoId: baseScore.video_id,
+          score: Number(baseScore.score) || 0,
+          createdAt: baseScore.created_at
+        }
+      : null,
+    signals: signalRows.map((r) => ({
+      videoId: r.video_id,
+      type: r.signal_type,
+      score: Number(r.score) || 0,
+      createdAt: r.created_at
+    })),
+    tagSignals: tagRows.map((r) => ({
+      videoId: r.video_id,
+      tag: r.tag,
+      weight: Number(r.weight) || 0,
+      createdAt: r.created_at
+    }))
+  };
+}
+
+export async function getRelatedVideos(videoId, { limit = 6 } = {}) {
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 6));
+  const { rows } = await query(
+    `
+      WITH target_tags AS (
+        SELECT tag, weight
+        FROM video_tag_signals
+        WHERE video_id = $1
+      )
+      SELECT
+        v.id,
+        v.title,
+        v.embed_url,
+        v.src,
+        v.provider,
+        v.provider_id,
+        v.thumbnail,
+        v.library,
+        v.source,
+        v.duration,
+        v.date,
+        v.description,
+        v.tags,
+        v.created_at,
+        v.updated_at,
+        v.file_name,
+        v.size_bytes,
+        v.width,
+        v.height,
+        v.status,
+        v.published,
+        v.preview_src,
+        v.s3_key,
+        v.r2_key,
+        COALESCE(SUM(t.weight), 0) AS related_score
+      FROM target_tags t
+      JOIN video_tag_signals vts
+        ON vts.tag = t.tag
+      JOIN videos v
+        ON v.id = vts.video_id
+      WHERE v.id <> $1
+        AND v.published = TRUE
+      GROUP BY
+        v.id, v.title, v.embed_url, v.src,
+        v.provider, v.provider_id,
+        v.thumbnail, v.library, v.source,
+        v.duration, v.date, v.description,
+        v.tags, v.created_at, v.updated_at,
+        v.file_name, v.size_bytes, v.width, v.height,
+        v.status, v.published, v.preview_src,
+        v.s3_key, v.r2_key
+      ORDER BY related_score DESC, v.created_at DESC
+      LIMIT $2
+    `,
+    [videoId, safeLimit]
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    embedUrl: r.embed_url ?? null,
+    src: r.src ?? null,
+    provider: r.provider ?? "custom",
+    providerId: r.provider_id ?? null,
+    thumbnail: r.thumbnail ?? null,
+    library: r.library ?? null,
+    source: r.source ?? null,
+    duration: r.duration ?? null,
+    description: r.description ?? null,
+    tags: Array.isArray(r.tags) ? r.tags : [],
+    createdAt: r.created_at ?? null,
+    relatedScore: Number(r.related_score) || 0
+  }));
+}
+
+// ======================================================================
+// Read helpers for API
+// ======================================================================
+
+export async function getVideoSignalsForVideo(videoId) {
+  if (!videoId) return null;
+
+  const [signalsRes, tagsRes, scoreRes] = await Promise.all([
+    query(
+      `
+        SELECT signal_type, score, created_at
+        FROM video_signals
+        WHERE video_id = $1
+        ORDER BY created_at DESC, signal_type ASC
+      `,
+      [videoId]
+    ),
+    query(
+      `
+        SELECT tag, weight, created_at
+        FROM video_tag_signals
+        WHERE video_id = $1
+        ORDER BY weight DESC, tag ASC
+      `,
+      [videoId]
+    ),
+    query(
+      `
+        SELECT score, created_at
+        FROM video_scores
+        WHERE video_id = $1
+        LIMIT 1
+      `,
+      [videoId]
+    )
+  ]);
+
+  const scoreRow = scoreRes.rows[0] || null;
+
+  if (!signalsRes.rows.length && !tagsRes.rows.length && !scoreRow) {
+    return null;
+  }
+
+  return {
+    videoId,
+    score: scoreRow ? Number(scoreRow.score) || 0 : 0,
+    scoreCreatedAt: scoreRow ? scoreRow.created_at : null,
+    signals: signalsRes.rows.map((r) => ({
+      type: r.signal_type,
+      score: Number(r.score) || 0,
+      createdAt: r.created_at
+    })),
+    tags: tagsRes.rows.map((r) => ({
+      tag: r.tag,
+      weight: Number(r.weight) || 0,
+      createdAt: r.created_at
+    }))
+  };
+}
+
+export async function getRelatedVideosForVideo(videoId, { limit = 8 } = {}) {
+  if (!videoId) return [];
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 8));
+
+  const { rows } = await query(
+    `
+      SELECT
+        v.id,
+        v.title,
+        COALESCE(vs.score, 0) AS score,
+        COUNT(DISTINCT t2.tag) AS overlap_tags,
+        MAX(v.created_at) AS created_at
+      FROM video_tag_signals t1
+      JOIN video_tag_signals t2
+        ON t1.tag = t2.tag
+      JOIN videos v
+        ON v.id = t2.video_id
+      LEFT JOIN video_scores vs
+        ON vs.video_id = v.id
+      WHERE t1.video_id = $1
+        AND t2.video_id <> $1
+      GROUP BY v.id, v.title, vs.score
+      ORDER BY overlap_tags DESC, score DESC, created_at DESC
+      LIMIT $2
+    `,
+    [videoId, safeLimit]
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    score: Number(r.score) || 0,
+    overlapTags: Number(r.overlap_tags) || 0
+  }));
 }
