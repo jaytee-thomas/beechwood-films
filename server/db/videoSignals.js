@@ -126,6 +126,7 @@ async function insertSignalRows({ signalRows, tagRows, score, createdAt, videoId
  * data: { videoId?: string }
  */
 export async function recomputeVideoSignals(data = {}) {
+  console.log("[signals] recomputeVideoSignals called with:", data);
   const { videoId } = data || {};
 
   if (videoId) {
@@ -149,6 +150,7 @@ export async function recomputeVideoSignals(data = {}) {
     const built = buildSignalsForVideo(video);
     await insertSignalRows({ ...built, videoId: video.id });
 
+    console.log("[signals] recomputeVideoSignals done – processed = 1 (single)");
     return { processed: 1, videoId: video.id };
   }
 
@@ -170,5 +172,6 @@ export async function recomputeVideoSignals(data = {}) {
     processed += 1;
   }
 
+  console.log("[signals] recomputeVideoSignals done – processed =", processed);
   return { processed };
 }
