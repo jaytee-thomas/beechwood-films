@@ -39,12 +39,12 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export async function fetchRecentJobs(): Promise<QueueJob[]> {
-  const data = await getJson<RecentJobsResponse>("/queues/jobs/recent");
+  const data = await getJson<RecentJobsResponse>("/api/queues/jobs/recent");
   return data.jobs ?? [];
 }
 
 export async function recomputeAllSignals(): Promise<RecomputeResponse> {
-  const url = apiUrl("/queues/video/recompute");
+  const url = apiUrl("/api/queues/video/recompute");
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
@@ -59,7 +59,7 @@ export async function recomputeAllSignals(): Promise<RecomputeResponse> {
 }
 
 export async function recomputeSignalsForVideo(id: string): Promise<RecomputeResponse> {
-  const url = apiUrl("/queues/video/recompute");
+  const url = apiUrl("/api/queues/video/recompute");
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",

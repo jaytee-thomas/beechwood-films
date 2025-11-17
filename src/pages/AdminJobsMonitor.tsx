@@ -67,7 +67,7 @@ export const AdminJobsMonitor: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const es = new EventSource(apiUrl("/queues/jobs/stream"), {
+    const es = new EventSource(apiUrl("/api/queues/jobs/stream"), {
       withCredentials: true
     });
     es.onopen = () => setSseConnected(true);
