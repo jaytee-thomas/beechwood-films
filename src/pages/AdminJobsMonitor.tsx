@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchRecentJobs, type QueueJob } from "../api/queues";
+import {
+  fetchRecentJobs,
+  recomputeAllSignals,
+  type QueueJob
+} from "../api/queues";
+import { apiUrl } from "../api/videos.js";
 
 type SseEvent = {
   id: string;
@@ -40,6 +45,8 @@ export const AdminJobsMonitor: React.FC = () => {
 
   const [sseConnected, setSseConnected] = useState(false);
   const [events, setEvents] = useState<SseEvent[]>([]);
+  const [recomputeBusy, setRecomputeBusy] = useState(false);
+  const [recomputeMessage, setRecomputeMessage] = useState<string | null>(null);
 
   const loadJobs = async () => {
     try {
@@ -60,7 +67,9 @@ export const AdminJobsMonitor: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const es = new EventSource("/api/queues/jobs/stream", { withCredentials: true });
+    const es = new EventSource(apiUrl("/queues/jobs/stream"), {
+      withCredentials: true
+    });
     es.onopen = () => setSseConnected(true);
     es.onerror = () => setSseConnected(false);
 
@@ -108,6 +117,35 @@ export const AdminJobsMonitor: React.FC = () => {
     return list;
   }, [jobs, statusFilter]);
 
+  const lastRecomputeJob = useMemo(() => {
+    if (!jobs || jobs.length === 0) return null;
+    const recomputeJobs = jobs.filter((job) => job.type === "recomputeVideoSignals");
+    if (recomputeJobs.length === 0) return null;
+    const sorted = [...recomputeJobs].sort((a, b) => {
+      const aTime = Number(a.finished_at ?? a.created_at ?? 0);
+      const bTime = Number(b.finished_at ?? b.created_at ?? 0);
+      return bTime - aTime;
+    });
+    return sorted[0];
+  }, [jobs]);
+
+  const handleRecomputeAll = async () => {
+    try {
+      setRecomputeBusy(true);
+      setRecomputeMessage(null);
+      const result = await recomputeAllSignals();
+      setRecomputeMessage(
+        `Recompute enqueued (job ${result.jobId}, mode: ${result.mode}).`
+      );
+      await loadJobs();
+    } catch (err: any) {
+      console.error("Failed to enqueue recompute-all job", err);
+      setRecomputeMessage(err?.message ?? "Failed to enqueue recompute-all job");
+    } finally {
+      setRecomputeBusy(false);
+    }
+  };
+
   return (
     <div style={{ padding: "1.5rem", maxWidth: 1200, margin: "0 auto" }}>
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
@@ -136,23 +174,51 @@ export const AdminJobsMonitor: React.FC = () => {
             cursor: loading ? "default" : "pointer"
           }}
         >
-          {loading ? "Refreshing…" : "Refresh jobs"}
+          {loading ? "Loading…" : "Refresh"}
         </button>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-          Status:
+
+        <button
+          onClick={() => void handleRecomputeAll()}
+          disabled={recomputeBusy}
+          style={{
+            padding: "0.4rem 0.8rem",
+            borderRadius: 999,
+            border: "1px solid #444",
+            backgroundColor: "#111",
+            color: "#fff",
+            cursor: recomputeBusy ? "default" : "pointer",
+            fontSize: "0.85rem"
+          }}
+        >
+          {recomputeBusy ? "Enqueuing…" : "Recompute all signals"}
+        </button>
+
+        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <span style={{ fontSize: "0.85rem" }}>Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ padding: "0.25rem 0.5rem", borderRadius: 999 }}
+            style={{
+              padding: "0.3rem 0.7rem",
+              borderRadius: 999,
+              border: "1px solid #ccc",
+              fontSize: "0.85rem"
+            }}
           >
-            <option value="all">All</option>
-            {Object.keys(STATUS_PRIORITY).map((status) => (
+            { ["all", "queued", "running", "succeeded", "failed"].map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
             ))}
           </select>
         </label>
+
+        {lastRecomputeJob && (
+          <span style={{ fontSize: "0.8rem", color: "#555" }}>
+            Last recompute: {formatEpoch(lastRecomputeJob.finished_at || lastRecomputeJob.created_at)}
+          </span>
+        )}
+
         <span
           style={{
             marginLeft: "auto",
@@ -179,6 +245,21 @@ export const AdminJobsMonitor: React.FC = () => {
           }}
         >
           {error}
+        </div>
+      )}
+
+      {recomputeMessage && (
+        <div
+          style={{
+            marginBottom: "0.75rem",
+            fontSize: "0.85rem",
+            padding: "0.4rem 0.6rem",
+            borderRadius: 8,
+            backgroundColor: "#f5f5f5",
+            border: "1px solid #ddd"
+          }}
+        >
+          {recomputeMessage}
         </div>
       )}
 

@@ -3,7 +3,7 @@ const API_BASE =
     import.meta.env?.VITE_API_ORIGIN?.replace(/\/+$/, "")) ||
   "";
 
-function apiUrl(path) {
+export function apiUrl(path) {
   if (API_BASE) return `${API_BASE}${path}`;
   return path;
 }

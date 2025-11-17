@@ -7,6 +7,7 @@ import Header from "./Header";
 import MCard from "./MCard.jsx";
 import { isDashSource, isHlsSource } from "../utils/streaming.js";
 import { fetchVideoSignals, fetchRelatedVideos } from "../api/videos.js";
+import { recomputeSignalsForVideo } from "../api/queues";
 
 const VIDEO_MIME_TYPES = {
   mp4: "video/mp4",
@@ -102,6 +103,9 @@ export default function Player() {
   const [loadingRelated, setLoadingRelated] = useState(false);
   const [signalsError, setSignalsError] = useState(null);
   const [relatedError, setRelatedError] = useState(null);
+  const [recomputeBusy, setRecomputeBusy] = useState(false);
+  const [recomputeMessage, setRecomputeMessage] = useState("");
+  const [recomputeError, setRecomputeError] = useState(null);
 
   const provider = (video?.provider || "").toLowerCase();
   const isYouTube = provider === "youtube";
@@ -127,8 +131,12 @@ useEffect(() => {
       setRelatedFromApi([]);
       setSignalsError(null);
       setRelatedError(null);
+      setRecomputeMessage("");
+      setRecomputeError(null);
       return;
     }
+    setRecomputeMessage("");
+    setRecomputeError(null);
     let cancelled = false;
     const load = async () => {
       setSignalsError(null);
@@ -322,7 +330,9 @@ useEffect(() => {
   }, [videos, progress, id]);
 
   function playVideoById(vid) {
-    navigate(`/watch/${vid.id}`);
+    const targetId = typeof vid === "string" ? vid : vid?.id;
+    if (!targetId) return;
+    navigate(`/watch/${targetId}`);
   }
 
   // progress percent helper for cards
@@ -347,6 +357,24 @@ useEffect(() => {
         .catch(() => {});
     } else if (typeof window !== "undefined") {
       window.alert(`Share "${videoItem.title}" with your collaborators!`);
+    }
+  };
+
+  const handleRecomputeSignals = async () => {
+    if (!video?.id || recomputeBusy) return;
+    setRecomputeBusy(true);
+    setRecomputeMessage("");
+    setRecomputeError(null);
+    try {
+      const result = await recomputeSignalsForVideo(String(video.id));
+      setRecomputeMessage(
+        `Recompute enqueued (job ${result.jobId}, mode: ${result.mode}).`
+      );
+    } catch (err) {
+      console.error("Failed to enqueue recompute job for video", err);
+      setRecomputeError("Could not enqueue recompute job for this video.");
+    } finally {
+      setRecomputeBusy(false);
     }
   };
 
@@ -645,7 +673,47 @@ useEffect(() => {
 
                 <div className='player-insights'>
                   <section className='player-signals'>
-                    <h3>Signals</h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.75rem",
+                        marginBottom: "0.35rem"
+                      }}
+                    >
+                      <h3 style={{ margin: 0 }}>Signals</h3>
+                      {isAdmin && video?.id && (
+                        <button
+                          type='button'
+                          onClick={handleRecomputeSignals}
+                          disabled={recomputeBusy}
+                          style={{
+                            fontSize: "0.75rem",
+                            padding: "0.25rem 0.6rem",
+                            borderRadius: 999,
+                            border: "1px solid #ccc",
+                            backgroundColor: "#fff",
+                            cursor: recomputeBusy ? "default" : "pointer",
+                            opacity: recomputeBusy ? 0.7 : 1
+                          }}
+                        >
+                          {recomputeBusy ? "Enqueuing…" : "Recompute signals"}
+                        </button>
+                      )}
+                    </div>
+
+                    {recomputeMessage && (
+                      <p className='muted' style={{ marginBottom: "0.35rem" }}>
+                        {recomputeMessage}
+                      </p>
+                    )}
+                    {recomputeError && (
+                      <p className='error-text' style={{ marginBottom: "0.35rem" }}>
+                        {recomputeError}
+                      </p>
+                    )}
+
                     {loadingSignals && <p className='muted'>Loading signals…</p>}
                     {!loadingSignals && signalsError && (
                       <p className='error-text'>{signalsError}</p>
@@ -678,9 +746,9 @@ useEffect(() => {
                             <h4>Raw signals</h4>
                             <ul>
                               {signalsData.signals.map((sig, idx) => (
-                                <li key={idx}>
+                                <li key={`${sig.signal_type || sig.type}-${idx}`}>
                                   <span className='signal-type'>{sig.signal_type || sig.type}</span>
-                                  <span className='signal-score'>× {sig.score}</span>
+                                  <span className='signal-score'>{sig.score ?? 0}</span>
                                 </li>
                               ))}
                             </ul>
@@ -707,7 +775,7 @@ useEffect(() => {
                           <li
                             key={item.id}
                             className='related-item'
-                            onClick={() => playVideoById({ id: item.id })}
+                            onClick={() => playVideoById(item.id)}
                           >
                             <div className='related-main'>
                               <span className='related-title'>{item.title}</span>
