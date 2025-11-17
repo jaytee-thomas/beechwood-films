@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   fetchRecentJobs,
   recomputeAllSignals,
   type QueueJob
 } from "../api/queues";
 import { apiUrl } from "../api/videos.js";
+import useAuth from "../store/useAuth.js";
 
 type SseEvent = {
   id: string;
@@ -38,6 +39,7 @@ const formatDuration = (start: string | null, end: string | null) => {
 };
 
 export const AdminJobsMonitor: React.FC = () => {
+  const token = useAuth((state) => state.token);
   const [jobs, setJobs] = useState<QueueJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,11 +50,11 @@ export const AdminJobsMonitor: React.FC = () => {
   const [recomputeBusy, setRecomputeBusy] = useState(false);
   const [recomputeMessage, setRecomputeMessage] = useState<string | null>(null);
 
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchRecentJobs();
+      const data = await fetchRecentJobs(token);
       setJobs(data);
     } catch (err: any) {
       console.error("Failed to load queue jobs", err);
@@ -60,7 +62,7 @@ export const AdminJobsMonitor: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     loadJobs();
@@ -133,7 +135,7 @@ export const AdminJobsMonitor: React.FC = () => {
     try {
       setRecomputeBusy(true);
       setRecomputeMessage(null);
-      const result = await recomputeAllSignals();
+      const result = await recomputeAllSignals(token);
       setRecomputeMessage(
         `Recompute enqueued (job ${result.jobId}, mode: ${result.mode}).`
       );

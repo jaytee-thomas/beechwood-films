@@ -24,51 +24,63 @@ type RecomputeResponse = {
   mode: string;
 };
 
-async function getJson<T>(path: string): Promise<T> {
+async function getJson<T>(path: string, token?: string): Promise<T> {
   const url = apiUrl(path);
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(url, {
     method: "GET",
-    credentials: "include"
+    credentials: "include",
+    headers
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(`GET ${url} failed: ${res.status} ${text}`);
   }
   return res.json() as Promise<T>;
 }
 
-export async function fetchRecentJobs(): Promise<QueueJob[]> {
-  const data = await getJson<RecentJobsResponse>("/api/queues/jobs/recent");
+export async function fetchRecentJobs(token?: string): Promise<QueueJob[]> {
+  const data = await getJson<RecentJobsResponse>("/api/queues/jobs/recent", token);
   return data.jobs ?? [];
 }
 
-export async function recomputeAllSignals(): Promise<RecomputeResponse> {
+export async function recomputeAllSignals(token?: string): Promise<RecomputeResponse> {
   const url = apiUrl("/api/queues/video/recompute");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" }
+    headers
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(`POST ${url} failed: ${res.status} ${text}`);
   }
   return res.json() as Promise<RecomputeResponse>;
 }
 
-export async function recomputeSignalsForVideo(id: string): Promise<RecomputeResponse> {
+export async function recomputeSignalsForVideo(id: string, token?: string): Promise<RecomputeResponse> {
   const url = apiUrl("/api/queues/video/recompute");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ id })
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(`POST ${url} failed: ${res.status} ${text}`);
   }
   return res.json() as Promise<RecomputeResponse>;

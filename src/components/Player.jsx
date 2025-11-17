@@ -8,6 +8,7 @@ import MCard from "./MCard.jsx";
 import { isDashSource, isHlsSource } from "../utils/streaming.js";
 import { fetchVideoSignals, fetchRelatedVideos } from "../api/videos.js";
 import { recomputeSignalsForVideo } from "../api/queues";
+import useAuth from "../store/useAuth.js";
 
 const VIDEO_MIME_TYPES = {
   mp4: "video/mp4",
@@ -66,6 +67,7 @@ const inferMimeFromQuery = (url = "") => {
 };
 
 export default function Player() {
+  const token = useAuth((state) => state.token);
   const { id } = useParams();
   const navigate = useNavigate();
   const {
@@ -366,7 +368,7 @@ useEffect(() => {
     setRecomputeMessage("");
     setRecomputeError(null);
     try {
-      const result = await recomputeSignalsForVideo(String(video.id));
+      const result = await recomputeSignalsForVideo(String(video.id), token);
       setRecomputeMessage(
         `Recompute enqueued (job ${result.jobId}, mode: ${result.mode}).`
       );
