@@ -1,5 +1,3 @@
-import { apiUrl } from "./videos";
-
 export type QueueJob = {
   job_id: string;
   queue: string;
@@ -18,16 +16,22 @@ export type RecentJobsResponse = {
   jobs: QueueJob[];
 };
 
-type RecomputeResponse = {
-  enqueued: boolean;
-  jobId: string;
-  mode: string;
-};
+const API_BASE =
+  (typeof import.meta !== "undefined" &&
+    import.meta.env?.VITE_API_ORIGIN?.replace(/\/+$/, "")) ||
+  "";
+
+function apiUrl(path: string): string {
+  if (API_BASE) return `${API_BASE}${path}`;
+  return path;
+}
 
 async function getJson<T>(path: string, token?: string): Promise<T> {
   const url = apiUrl(path);
   const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const res = await fetch(url, {
     method: "GET",
@@ -37,9 +41,32 @@ async function getJson<T>(path: string, token?: string): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`GET ${url} failed: ${res.status} ${text}`);
+    throw new Error(`GET ${path} failed: ${res.status} ${text}`);
   }
+
   return res.json() as Promise<T>;
+}
+
+async function postJson(path: string, body: unknown, token?: string): Promise<void> {
+  const url = apiUrl(path);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify(body ?? {})
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST ${path} failed: ${res.status} ${text}`);
+  }
 }
 
 export async function fetchRecentJobs(token?: string): Promise<QueueJob[]> {
@@ -47,41 +74,14 @@ export async function fetchRecentJobs(token?: string): Promise<QueueJob[]> {
   return data.jobs ?? [];
 }
 
-export async function recomputeAllSignals(token?: string): Promise<RecomputeResponse> {
-  const url = apiUrl("/api/queues/video/recompute");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json"
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    headers
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`POST ${url} failed: ${res.status} ${text}`);
-  }
-  return res.json() as Promise<RecomputeResponse>;
+export async function recomputeAllSignals(token?: string): Promise<void> {
+  await postJson("/api/queues/video/recompute", {}, token);
 }
 
-export async function recomputeSignalsForVideo(id: string, token?: string): Promise<RecomputeResponse> {
-  const url = apiUrl("/api/queues/video/recompute");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json"
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    headers,
-    body: JSON.stringify({ id })
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`POST ${url} failed: ${res.status} ${text}`);
-  }
-  return res.json() as Promise<RecomputeResponse>;
+export async function recomputeSignalsForVideo(
+  videoId: string,
+  token?: string
+): Promise<void> {
+  if (!videoId) throw new Error("recomputeSignalsForVideo: videoId is required");
+  await postJson("/api/queues/video/recompute", { id: videoId }, token);
 }
