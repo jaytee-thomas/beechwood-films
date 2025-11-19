@@ -1,106 +1,67 @@
-const apiUrl =
-  (typeof import.meta !== "undefined" &&
-    (import.meta.env?.VITE_API_ORIGIN || import.meta.env?.VITE_API_URL)) ||
-  "";
+const API_ORIGIN =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_ORIGIN) ||
+  (typeof window !== "undefined" ? window.location.origin : "");
 
-function getAuthTokenFromStorage(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem("bf-auth-v1");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (typeof parsed?.state?.token === "string" && parsed.state.token.length) {
-      return parsed.state.token;
-    }
-    if (typeof parsed?.token === "string" && parsed.token.length) {
-      return parsed.token;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
+const API_BASE = `${(API_ORIGIN || "").replace(/\/$/, "")}/api/queues`;
 
-function buildAuthHeaders(explicitToken?: string): HeadersInit {
+function authHeaders(token?: string): HeadersInit {
   const headers: Record<string, string> = {
     "Content-Type": "application/json"
   };
-  const token = explicitToken || getAuthTokenFromStorage();
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
 
-export type QueueJob = {
-  job_id: string;
-  queue: string;
-  type: string;
-  status: string;
-  actor_email: string | null;
-  actor_user_id: string | null;
-  video_id: string | null;
-  created_at: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-  attempts: number;
-};
+function handleError(path: string, res: Response): Promise<never> {
+  return res
+    .text()
+    .catch(() => "")
+    .then((text) => {
+      throw new Error(`Request ${path} failed: ${res.status} ${res.statusText} ${text}`);
+    });
+}
 
-export type RecentJobsResponse = {
-  jobs: QueueJob[];
-};
-
-export async function fetchRecentJobs(token?: string) {
-  const res = await fetch(`${apiUrl}/queues/jobs/recent`, {
+export async function fetchRecentJobs(token?: string): Promise<{ jobs: any[] }> {
+  const url = `${API_BASE}/jobs/recent`;
+  const res = await fetch(url, {
     method: "GET",
-    headers: buildAuthHeaders(token),
-    credentials: "include"
+    credentials: "include",
+    headers: authHeaders(token)
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to load jobs (${res.status} ${res.statusText}) ${text || ""}`
-    );
-  }
-  return res.json() as Promise<{ jobs: QueueJob[] }>;
+  if (!res.ok) throw await handleError(url, res);
+  return res.json();
 }
 
-export async function recomputeAllSignals(token?: string) {
-  const res = await fetch(`${apiUrl}/queues/video/recompute-all`, {
+export async function recomputeAllSignals(
+  token?: string
+): Promise<{ jobId: string; mode?: string }> {
+  const url = `${API_BASE}/video/recompute-all`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: buildAuthHeaders(token),
     credentials: "include",
-    body: JSON.stringify({})
+    headers: authHeaders(token)
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to enqueue recompute-all job (${res.status} ${res.statusText}) ${text || ""}`
-    );
-  }
-  return res.json() as Promise<{ jobId: string; mode?: string }>;
+  if (!res.ok) throw await handleError(url, res);
+  return res.json();
 }
 
-export async function recomputeSignalsForVideo(videoId: string, token?: string) {
-  if (!videoId) throw new Error("recomputeSignalsForVideo: videoId is required");
-  const res = await fetch(`${apiUrl}/queues/video/recompute`, {
+export async function recomputeSignalsForVideo(
+  videoId: string,
+  token?: string
+): Promise<{ jobId: string; mode?: string }> {
+  const url = `${API_BASE}/video/recompute`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: buildAuthHeaders(token),
     credentials: "include",
+    headers: authHeaders(token),
     body: JSON.stringify({ id: videoId })
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to enqueue recompute job (${res.status} ${res.statusText}) ${text || ""}`
-    );
-  }
-  return res.json() as Promise<{ jobId: string; mode?: string }>;
+  if (!res.ok) throw await handleError(url, res);
+  return res.json();
 }
 
-export function openJobsEventSource(token?: string): EventSource {
-  const url = new URL(`${apiUrl}/queues/jobs/stream`);
-  const authToken = token || getAuthTokenFromStorage();
-  if (authToken) {
-    url.searchParams.set("token", authToken);
-  }
+export function createJobsEventSource(token: string): EventSource {
+  const url = new URL(`${API_BASE}/jobs/stream`);
+  if (token) url.searchParams.set("token", token);
   return new EventSource(url.toString(), { withCredentials: true });
 }
