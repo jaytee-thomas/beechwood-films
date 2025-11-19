@@ -1,7 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import useLibraryStore from "../store/useLibraryStore";
-import useAuth from "../store/useAuth";
 import useAdminPanel from "../store/useAdminPanel";
 import Header from "./Header";
 import MCard from "./MCard.jsx";
@@ -30,7 +35,7 @@ const VIDEO_MIME_TYPES = {
   "3gp": "video/3gpp",
   "3g2": "video/3gpp2",
   m3u8: "application/x-mpegURL",
-  mpd: "application/dash+xml"
+  mpd: "application/dash+xml",
 };
 
 const inferExtension = (url = "") => {
@@ -86,7 +91,10 @@ export default function Player() {
   const openLogin = useAdminPanel((state) => state.openLogin);
   const isAdmin = authUser?.role === "admin";
   const isAuthenticated = Boolean(authUser);
-  const displayName = authUser?.name || authUser?.email || (authUser?.role === "guest" ? "Guest" : "Profile");
+  const displayName =
+    authUser?.name ||
+    authUser?.email ||
+    (authUser?.role === "guest" ? "Guest" : "Profile");
 
   // header states
   const [search, setSearch] = useState("");
@@ -123,9 +131,9 @@ export default function Player() {
     isVimeo && video?.embedUrl ? `${video.embedUrl}?autoplay=1` : null;
 
   // record that this video was watched (for recency)
-useEffect(() => {
-  if (video) recordWatch(video.id);
-}, [video, recordWatch]);
+  useEffect(() => {
+    if (video) recordWatch(video.id);
+  }, [video, recordWatch]);
 
   useEffect(() => {
     if (!video?.id) {
@@ -268,7 +276,10 @@ useEffect(() => {
     return null;
   }, [normaliseCandidate, video]);
 
-  const streamSource = fileSource && (isHlsSource(fileSource) || isDashSource(fileSource)) ? fileSource : null;
+  const streamSource =
+    fileSource && (isHlsSource(fileSource) || isDashSource(fileSource))
+      ? fileSource
+      : null;
   const playableFileSource = streamSource ? null : fileSource;
 
   useEffect(() => {
@@ -537,24 +548,33 @@ useEffect(() => {
                       />
                     </video>
                   )}
-                  {isFile && (!playableFileSource?.url || filePlaybackError) && (
-                    <div className='bf-playerNotFound'>
-                      {streamSource ? (
-                        <p>
-                          This video uses a streaming format ({isHlsSource(streamSource) ? "HLS" : "MPEG-DASH"}). Open it in a compatible player or convert it to MP4/WebM:
-                          {" "}
-                          <a href={streamSource.url} target='_blank' rel='noreferrer noopener'>
-                            {streamSource.url}
-                          </a>
-                          .
-                        </p>
-                      ) : (
-                        <p>
-                          This video format isn’t supported by your browser. Try uploading an MP4/WebM version for widest compatibility.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {isFile &&
+                    (!playableFileSource?.url || filePlaybackError) && (
+                      <div className='bf-playerNotFound'>
+                        {streamSource ? (
+                          <p>
+                            This video uses a streaming format (
+                            {isHlsSource(streamSource) ? "HLS" : "MPEG-DASH"}).
+                            Open it in a compatible player or convert it to
+                            MP4/WebM:{" "}
+                            <a
+                              href={streamSource.url}
+                              target='_blank'
+                              rel='noreferrer noopener'
+                            >
+                              {streamSource.url}
+                            </a>
+                            .
+                          </p>
+                        ) : (
+                          <p>
+                            This video format isn’t supported by your browser.
+                            Try uploading an MP4/WebM version for widest
+                            compatibility.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   {isYouTube && ytSrc && (
                     <iframe
                       className='bf-playerFrame'
@@ -598,7 +618,7 @@ useEffect(() => {
                         const secondaryLabel =
                           videoItem.library ||
                           (Array.isArray(videoItem.tags) &&
-                            videoItem.tags.length > 0
+                          videoItem.tags.length > 0
                             ? videoItem.tags[0]
                             : "") ||
                           "";
@@ -681,7 +701,7 @@ useEffect(() => {
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: "0.75rem",
-                        marginBottom: "0.35rem"
+                        marginBottom: "0.35rem",
                       }}
                     >
                       <h3 style={{ margin: 0 }}>Signals</h3>
@@ -697,7 +717,7 @@ useEffect(() => {
                             border: "1px solid #ccc",
                             backgroundColor: "#fff",
                             cursor: recomputeBusy ? "default" : "pointer",
-                            opacity: recomputeBusy ? 0.7 : 1
+                            opacity: recomputeBusy ? 0.7 : 1,
                           }}
                         >
                           {recomputeBusy ? "Enqueuing…" : "Recompute signals"}
@@ -711,12 +731,17 @@ useEffect(() => {
                       </p>
                     )}
                     {recomputeError && (
-                      <p className='error-text' style={{ marginBottom: "0.35rem" }}>
+                      <p
+                        className='error-text'
+                        style={{ marginBottom: "0.35rem" }}
+                      >
                         {recomputeError}
                       </p>
                     )}
 
-                    {loadingSignals && <p className='muted'>Loading signals…</p>}
+                    {loadingSignals && (
+                      <p className='muted'>Loading signals…</p>
+                    )}
                     {!loadingSignals && signalsError && (
                       <p className='error-text'>{signalsError}</p>
                     )}
@@ -726,7 +751,9 @@ useEffect(() => {
                     {!loadingSignals && signalsData && (
                       <>
                         <div className='signals-score-row'>
-                          <span className='signals-score-label'>Signal score</span>
+                          <span className='signals-score-label'>
+                            Signal score
+                          </span>
                           <span className='signals-score-pill'>
                             {signalsData.score ?? 0}
                           </span>
@@ -736,7 +763,10 @@ useEffect(() => {
                             <h4>Tag signals</h4>
                             <div className='signals-tag-chips'>
                               {signalsData.tagSignals.map((tag) => (
-                                <span key={`${tag.tag}-${tag.created_at}`} className='signal-chip'>
+                                <span
+                                  key={`${tag.tag}-${tag.created_at}`}
+                                  className='signal-chip'
+                                >
                                   {tag.tag}
                                 </span>
                               ))}
@@ -748,9 +778,15 @@ useEffect(() => {
                             <h4>Raw signals</h4>
                             <ul>
                               {signalsData.signals.map((sig, idx) => (
-                                <li key={`${sig.signal_type || sig.type}-${idx}`}>
-                                  <span className='signal-type'>{sig.signal_type || sig.type}</span>
-                                  <span className='signal-score'>{sig.score ?? 0}</span>
+                                <li
+                                  key={`${sig.signal_type || sig.type}-${idx}`}
+                                >
+                                  <span className='signal-type'>
+                                    {sig.signal_type || sig.type}
+                                  </span>
+                                  <span className='signal-score'>
+                                    {sig.score ?? 0}
+                                  </span>
                                 </li>
                               ))}
                             </ul>
@@ -762,7 +798,9 @@ useEffect(() => {
 
                   <section className='player-related'>
                     <h3>Related videos</h3>
-                    {loadingRelated && <p className='muted'>Finding related videos…</p>}
+                    {loadingRelated && (
+                      <p className='muted'>Finding related videos…</p>
+                    )}
                     {!loadingRelated && relatedError && (
                       <p className='error-text'>{relatedError}</p>
                     )}
@@ -780,9 +818,13 @@ useEffect(() => {
                             onClick={() => playVideoById(item.id)}
                           >
                             <div className='related-main'>
-                              <span className='related-title'>{item.title}</span>
+                              <span className='related-title'>
+                                {item.title}
+                              </span>
                               {item.score != null && (
-                                <span className='related-score-pill'>score {item.score}</span>
+                                <span className='related-score-pill'>
+                                  score {item.score}
+                                </span>
                               )}
                             </div>
                             {item.tag_overlap_count && (
