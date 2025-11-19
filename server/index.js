@@ -79,20 +79,6 @@ app.use("/api/videos", videosRouter);
 app.use("/api", queueRoutes);
 if (uploadsRouter) app.use("/api/uploads", uploadsRouter);
 
-// static (prod)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distDir = path.resolve(__dirname, "../dist");
-if (isProduction) {
-  app.use(express.static(distDir));
-  app.use((req, res, next) => {
-    if (req.method !== "GET") return next();
-    if (req.path.startsWith("/api/")) return next();
-    if (path.extname(req.path)) return next();
-    res.sendFile(path.join(distDir, "index.html"), (err) => (err ? next(err) : undefined));
-  });
-}
-
 // error handler
 app.use((err, _req, res, _next) => {
   console.error(err);
