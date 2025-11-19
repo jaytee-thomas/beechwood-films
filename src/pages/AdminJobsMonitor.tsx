@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   fetchRecentJobs,
   recomputeAllSignals,
+  openJobsEventSource,
   type QueueJob
 } from "../api/queues";
-import { apiUrl } from "../api/videos.js";
 import useAuth from "../store/useAuth.js";
 
 type SseEvent = {
@@ -55,7 +55,7 @@ export const AdminJobsMonitor: React.FC = () => {
       setLoading(true);
       setError(null);
       const data = await fetchRecentJobs(token);
-      setJobs(data);
+      setJobs(data.jobs ?? []);
     } catch (err: any) {
       console.error("Failed to load queue jobs", err);
       setError(err?.message ?? "Failed to load jobs");
@@ -66,12 +66,10 @@ export const AdminJobsMonitor: React.FC = () => {
 
   useEffect(() => {
     loadJobs();
-  }, []);
+  }, [loadJobs]);
 
   useEffect(() => {
-    const es = new EventSource(apiUrl("/api/queues/jobs/stream"), {
-      withCredentials: true
-    });
+    const es = openJobsEventSource(token);
     es.onopen = () => setSseConnected(true);
     es.onerror = () => setSseConnected(false);
 
@@ -105,7 +103,7 @@ export const AdminJobsMonitor: React.FC = () => {
       es.close();
       setSseConnected(false);
     };
-  }, []);
+  }, [token]);
 
   const filteredJobs = useMemo(() => {
     let list = [...jobs];
