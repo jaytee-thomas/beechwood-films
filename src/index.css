@@ -96,8 +96,9 @@ body {
 
 .landing__cta {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .landing__btn {
@@ -119,6 +120,97 @@ body {
 
 .landing__btn--primary:hover {
   transform: translateY(-2px);
+}
+
+/* Prominent CTA buttons - impossible to miss! */
+.landing__ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 40px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(126, 92, 238, 0.95));
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  box-shadow: 0 20px 50px rgba(79, 70, 229, 0.45), 0 0 0 0 rgba(126, 92, 238, 0.4);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.landing__ctaPrimary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(101, 118, 224, 1), rgba(146, 102, 255, 1));
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: -1;
+}
+
+.landing__ctaPrimary:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 28px 60px rgba(79, 70, 229, 0.55), 0 0 0 4px rgba(126, 92, 238, 0.3);
+}
+
+.landing__ctaPrimary:hover::before {
+  opacity: 1;
+}
+
+.landing__ctaPrimary:active {
+  transform: translateY(-1px) scale(1);
+}
+
+.landing__ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 40px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(16, 18, 30, 0.6);
+  color: rgba(244, 245, 255, 0.95);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease, color 0.25s ease;
+  box-shadow: 0 12px 32px rgba(4, 5, 12, 0.35);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.landing__ctaSecondary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(81, 99, 199, 0.3), rgba(126, 92, 238, 0.3));
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: -1;
+}
+
+.landing__ctaSecondary:hover {
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(126, 92, 238, 0.8);
+  box-shadow: 0 20px 45px rgba(79, 70, 229, 0.35), 0 0 0 2px rgba(126, 92, 238, 0.2);
+  color: #ffffff;
+  background: rgba(23, 25, 38, 0.8);
+}
+
+.landing__ctaSecondary:hover::before {
+  opacity: 1;
+}
+
+.landing__ctaSecondary:active {
+  transform: translateY(-1px) scale(1);
 }
 
 .landing__logoPreview {
@@ -388,6 +480,50 @@ body {
   outline: none;
 }
 
+.landing__finalCta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: clamp(48px, 10vw, 72px) var(--page-pad-x);
+  width: min(100%, 1100px);
+  margin: 0 auto;
+}
+
+.landing__finalCtaContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+  padding: clamp(36px, 8vw, 48px) clamp(24px, 6vw, 40px);
+  border-radius: 32px;
+  background: linear-gradient(
+      130deg,
+      rgba(45, 54, 125, 0.18),
+      rgba(23, 25, 42, 0.82)
+    ),
+    rgba(7, 8, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 38px 82px rgba(5, 6, 14, 0.55);
+  width: 100%;
+  max-width: 800px;
+}
+
+.landing__finalCtaTitle {
+  margin: 0;
+  font-size: clamp(1.8rem, 3.6vw, 2.4rem);
+  line-height: 1.2;
+  color: #f7f9ff;
+}
+
+.landing__finalCtaLead {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(235, 237, 255, 0.8);
+  max-width: 600px;
+}
+
 @media (max-width: 720px) {
   .landing__testimonials {
     padding: 36px 20px;
@@ -395,6 +531,14 @@ body {
 
   .landing__clientStrip {
     justify-content: center;
+  }
+
+  .landing__finalCta {
+    padding: 36px 20px;
+  }
+
+  .landing__finalCtaContent {
+    padding: 32px 24px;
   }
 }
 
@@ -408,11 +552,20 @@ body {
     align-items: stretch;
     width: 100%;
     max-width: 420px;
+    gap: 14px;
   }
 
   .landing__btn {
     width: 100%;
   }
+
+  .landing__ctaPrimary,
+  .landing__ctaSecondary {
+    width: 100%;
+    padding: 16px 32px;
+    font-size: 1.05rem;
+  }
+}
 
   .landing__logoPreview {
     width: min(360px, 100%);

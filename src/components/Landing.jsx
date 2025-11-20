@@ -94,9 +94,31 @@ export default function Landing() {
           <h1 className='landing__title'>{title}</h1>
           <p className='landing__lead'>{lead}</p>
           <div className='landing__cta'>
-            <Link className='landing__btn landing__btn--primary' to={ctaLink || "/library"}>
-              {ctaLabel || "Explore Library"}
-            </Link>
+            <button
+              className='landing__ctaPrimary'
+              onClick={() => {
+                const contactForm = document.querySelector('.contact-form-section');
+                if (contactForm) {
+                  contactForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+            >
+              Start Your Project
+            </button>
+            <button
+              className='landing__ctaSecondary'
+              onClick={() => {
+                const reelsSection = document.querySelector('#featured-videos');
+                if (reelsSection) {
+                  reelsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                  // Fallback: navigate to reels page
+                  window.location.href = '/reels';
+                }
+              }}
+            >
+              View Reel
+            </button>
             {isAdmin && (
               <button
                 type='button'
@@ -115,7 +137,7 @@ export default function Landing() {
       </section>
 
       {quickLinks.length > 0 ? (
-        <section className='landing__sections' aria-label='Quick Links'>
+        <section id="featured-videos" className='landing__sections' aria-label='Quick Links'>
           {quickLinks.map((link) => (
             <Link className='landing__card' to={link.href} key={link.id}>
               <span className='landing__cardLabel'>{link.label}</span>
@@ -124,7 +146,7 @@ export default function Landing() {
           ))}
         </section>
       ) : (
-        <section className='landing__sections' aria-label='Library Sections'>
+        <section id="featured-videos" className='landing__sections' aria-label='Library Sections'>
           {FEATURED_SETS.map((set) => (
             <Link className='landing__card' to={set.to} key={set.id}>
               <span className='landing__cardLabel'>{set.label}</span>
