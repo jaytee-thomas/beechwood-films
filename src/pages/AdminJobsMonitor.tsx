@@ -3,8 +3,8 @@ import {
   fetchRecentJobs,
   recomputeAllSignals,
   createJobsEventSource,
+  type QueueJob
 } from "../api/queues";
-import type { QueueJob } from "../api/queues";
 import useAuth from "../store/useAuth.js";
 
 type SseEvent = {
@@ -18,17 +18,20 @@ const STATUS_PRIORITY: Record<string, number> = {
   failed: 0,
   running: 1,
   queued: 2,
-  succeeded: 3,
+  succeeded: 3
 };
 
-const formatEpoch = (value: string | null) => {
+const formatEpoch = (value: string | null | undefined) => {
   if (!value) return "—";
   const ms = Number(value);
   if (!Number.isFinite(ms)) return "—";
   return new Date(ms).toLocaleString();
 };
 
-const formatDuration = (start: string | null, end: string | null) => {
+const formatDuration = (
+  start: string | null | undefined,
+  end: string | null | undefined
+) => {
   if (!start || !end) return "—";
   const s = Number(start);
   const e = Number(end);
@@ -39,27 +42,22 @@ const formatDuration = (start: string | null, end: string | null) => {
 };
 
 export const AdminJobsMonitor: React.FC = () => {
-  const token = useAuth((state) => state.token) as string | null | undefined;
-
+  const token = useAuth((state) => state.token);
   const [jobs, setJobs] = useState<QueueJob[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "queued" | "running" | "succeeded" | "failed"
-  >("all");
-
-  const [sseConnected, setSseConnected] = useState<boolean>(false);
+  const [sseConnected, setSseConnected] = useState(false);
   const [events, setEvents] = useState<SseEvent[]>([]);
-  const [recomputeBusy, setRecomputeBusy] = useState<boolean>(false);
+  const [recomputeBusy, setRecomputeBusy] = useState(false);
   const [recomputeMessage, setRecomputeMessage] = useState<string | null>(null);
 
-  // ----- Load jobs (Refresh button + initial load) -----
   const loadJobs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchRecentJobs(token || undefined);
+      const data = await fetchRecentJobs(token);
       setJobs(data.jobs ?? []);
     } catch (err: any) {
       console.error("Failed to load queue jobs", err);
@@ -70,17 +68,10 @@ export const AdminJobsMonitor: React.FC = () => {
   }, [token]);
 
   useEffect(() => {
-    void loadJobs();
+    loadJobs();
   }, [loadJobs]);
 
-  // ----- SSE: live job events stream -----
   useEffect(() => {
-    // If there is no token yet, don’t try to connect
-    if (!token) {
-      setSseConnected(false);
-      return;
-    }
-
     const es = createJobsEventSource(token);
     es.onopen = () => setSseConnected(true);
     es.onerror = () => setSseConnected(false);
@@ -90,32 +81,31 @@ export const AdminJobsMonitor: React.FC = () => {
       try {
         parsed = JSON.parse(data);
       } catch {
-        // keep as raw string
+        /* keep as string */
       }
-
       setEvents((prev) => {
         const next: SseEvent[] = [
           {
             id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             event,
             data: parsed,
-            at: Date.now(),
+            at: Date.now()
           },
-          ...prev,
+          ...prev
         ];
         return next.slice(0, 50);
       });
     };
 
-    es.onmessage = (evt) => pushEvent(evt.type || "message", (evt as MessageEvent).data as string);
+    es.onmessage = (evt) => pushEvent(evt.type || "message", evt.data);
     es.addEventListener("hello", (evt) =>
-      pushEvent("hello", (evt as MessageEvent).data as string),
+      pushEvent("hello", (evt as MessageEvent).data)
     );
     es.addEventListener("ping", (evt) =>
-      pushEvent("ping", (evt as MessageEvent).data as string),
+      pushEvent("ping", (evt as MessageEvent).data)
     );
     es.addEventListener("job", (evt) =>
-      pushEvent("job", (evt as MessageEvent).data as string),
+      pushEvent("job", (evt as MessageEvent).data)
     );
 
     return () => {
@@ -124,61 +114,58 @@ export const AdminJobsMonitor: React.FC = () => {
     };
   }, [token]);
 
-  // ----- Derived views -----
   const filteredJobs = useMemo(() => {
     let list = [...jobs];
-
-    if (statusFilter !== "all") {
-      list = list.filter((job) => job.status === statusFilter);
-    }
-
+    if (statusFilter !== "all") list = list.filter((job) => job.status === statusFilter);
     list.sort((a, b) => {
       const sa = STATUS_PRIORITY[a.status] ?? 99;
       const sb = STATUS_PRIORITY[b.status] ?? 99;
       if (sa !== sb) return sa - sb;
       return Number(b.created_at ?? 0) - Number(a.created_at ?? 0);
     });
-
     return list;
   }, [jobs, statusFilter]);
 
   const lastRecomputeJob = useMemo(() => {
     if (!jobs || jobs.length === 0) return null;
     const recomputeJobs = jobs.filter(
-      (job) => job.type === "recomputeVideoSignals",
+      (job) => job.type === "recomputeVideoSignals"
     );
     if (recomputeJobs.length === 0) return null;
-
     const sorted = [...recomputeJobs].sort((a, b) => {
       const aTime = Number(a.finished_at ?? a.created_at ?? 0);
       const bTime = Number(b.finished_at ?? b.created_at ?? 0);
       return bTime - aTime;
     });
-
     return sorted[0];
   }, [jobs]);
 
-  // ----- Actions -----
+  const lastRecomputeTimestamp: string | null = useMemo(() => {
+    if (!lastRecomputeJob) return null;
+    return (
+      (lastRecomputeJob.finished_at as string | null | undefined) ??
+      (lastRecomputeJob.created_at as string | null | undefined) ??
+      null
+    );
+  }, [lastRecomputeJob]);
+
   const handleRecomputeAll = async () => {
     try {
       setRecomputeBusy(true);
       setRecomputeMessage(null);
-      const result = await recomputeAllSignals(token || undefined);
+      const result = await recomputeAllSignals(token);
       setRecomputeMessage(
-        `Recompute enqueued (job ${result.jobId}, mode: ${result.mode ?? "default"}).`,
+        `Recompute enqueued (job ${result.jobId}, mode: ${result.mode}).`
       );
       await loadJobs();
     } catch (err: any) {
       console.error("Failed to enqueue recompute-all job", err);
-      setRecomputeMessage(
-        err?.message ?? "Failed to enqueue recompute-all job",
-      );
+      setRecomputeMessage(err?.message ?? "Failed to enqueue recompute-all job");
     } finally {
       setRecomputeBusy(false);
     }
   };
 
-  // ----- Render -----
   return (
     <div style={{ padding: "1.5rem", maxWidth: 1200, margin: "0 auto" }}>
       <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
@@ -194,7 +181,7 @@ export const AdminJobsMonitor: React.FC = () => {
           gap: "0.75rem",
           alignItems: "center",
           flexWrap: "wrap",
-          marginBottom: "1rem",
+          marginBottom: "1rem"
         }}
       >
         <button
@@ -204,7 +191,7 @@ export const AdminJobsMonitor: React.FC = () => {
             padding: "0.4rem 0.8rem",
             borderRadius: 999,
             border: "1px solid #ccc",
-            cursor: loading ? "default" : "pointer",
+            cursor: loading ? "default" : "pointer"
           }}
         >
           {loading ? "Loading…" : "Refresh"}
@@ -220,7 +207,7 @@ export const AdminJobsMonitor: React.FC = () => {
             backgroundColor: "#111",
             color: "#fff",
             cursor: recomputeBusy ? "default" : "pointer",
-            fontSize: "0.85rem",
+            fontSize: "0.85rem"
           }}
         >
           {recomputeBusy ? "Enqueuing…" : "Recompute all signals"}
@@ -230,39 +217,25 @@ export const AdminJobsMonitor: React.FC = () => {
           <span style={{ fontSize: "0.85rem" }}>Status:</span>
           <select
             value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(
-                e.target.value as
-                  | "all"
-                  | "queued"
-                  | "running"
-                  | "succeeded"
-                  | "failed",
-              )
-            }
+            onChange={(e) => setStatusFilter(e.target.value)}
             style={{
               padding: "0.3rem 0.7rem",
               borderRadius: 999,
               border: "1px solid #ccc",
-              fontSize: "0.85rem",
+              fontSize: "0.85rem"
             }}
           >
-            {["all", "queued", "running", "succeeded", "failed"].map(
-              (status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ),
-            )}
+            {["all", "queued", "running", "succeeded", "failed"].map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
           </select>
         </label>
 
-        {lastRecomputeJob && (
+        {lastRecomputeTimestamp && (
           <span style={{ fontSize: "0.8rem", color: "#555" }}>
-            Last recompute:{" "}
-            {formatEpoch(
-              lastRecomputeJob.finished_at || lastRecomputeJob.created_at,
-            )}
+            Last recompute: {formatEpoch(lastRecomputeTimestamp)}
           </span>
         )}
 
@@ -273,7 +246,7 @@ export const AdminJobsMonitor: React.FC = () => {
             padding: "0.25rem 0.6rem",
             borderRadius: 999,
             backgroundColor: sseConnected ? "#e6ffed" : "#ffecec",
-            border: `1px solid ${sseConnected ? "#34c759" : "#ff3b30"}`,
+            border: `1px solid ${sseConnected ? "#34c759" : "#ff3b30"}`
           }}
         >
           SSE: {sseConnected ? "connected" : "disconnected"}
@@ -288,7 +261,7 @@ export const AdminJobsMonitor: React.FC = () => {
             borderRadius: 8,
             backgroundColor: "#ffecec",
             border: "1px solid #ff3b30",
-            color: "#900",
+            color: "#900"
           }}
         >
           {error}
@@ -303,23 +276,20 @@ export const AdminJobsMonitor: React.FC = () => {
             padding: "0.4rem 0.6rem",
             borderRadius: 8,
             backgroundColor: "#f5f5f5",
-            border: "1px solid #ddd",
+            border: "1px solid #ddd"
           }}
         >
           {recomputeMessage}
         </div>
       )}
 
-      <div
-        style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}
-      >
-        {/* Jobs table */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
         <div
           style={{
             borderRadius: 12,
             border: "1px solid #ddd",
             overflow: "hidden",
-            backgroundColor: "#fff",
+            backgroundColor: "#fff"
           }}
         >
           <div
@@ -328,47 +298,25 @@ export const AdminJobsMonitor: React.FC = () => {
               borderBottom: "1px solid #eee",
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
+              alignItems: "center"
             }}
           >
             <strong>Recent Jobs</strong>
-            <span style={{ fontSize: "0.85rem", color: "#666" }}>
-              {jobs.length} total
-            </span>
+            <span style={{ fontSize: "0.85rem", color: "#666" }}>{jobs.length} total</span>
           </div>
           <div style={{ maxHeight: 400, overflow: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "0.85rem",
-              }}
-            >
-              <thead
-                style={{ position: "sticky", top: 0, background: "#fafafa" }}
-              >
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+              <thead style={{ position: "sticky", top: 0, background: "#fafafa" }}>
                 <tr>
-                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    Job ID
-                  </th>
-                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    Status
-                  </th>
-                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    Type
-                  </th>
-                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    Video
-                  </th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>Job ID</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>Status</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>Type</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>Video</th>
                   <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
                     Started → Finished
                   </th>
-                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    Duration
-                  </th>
-                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    Attempts
-                  </th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>Duration</th>
+                  <th style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>Attempts</th>
                 </tr>
               </thead>
               <tbody>
@@ -376,11 +324,7 @@ export const AdminJobsMonitor: React.FC = () => {
                   <tr>
                     <td
                       colSpan={7}
-                      style={{
-                        padding: "1rem",
-                        textAlign: "center",
-                        color: "#777",
-                      }}
+                      style={{ padding: "1rem", textAlign: "center", color: "#777" }}
                     >
                       No jobs yet.
                     </td>
@@ -391,7 +335,7 @@ export const AdminJobsMonitor: React.FC = () => {
                     <td
                       style={{
                         padding: "0.4rem 0.5rem",
-                        borderBottom: "1px solid #f3f3f3",
+                        borderBottom: "1px solid #f3f3f3"
                       }}
                     >
                       <code>{job.job_id}</code>
@@ -400,7 +344,7 @@ export const AdminJobsMonitor: React.FC = () => {
                       style={{
                         padding: "0.4rem 0.5rem",
                         borderBottom: "1px solid #f3f3f3",
-                        textTransform: "capitalize",
+                        textTransform: "capitalize"
                       }}
                     >
                       {job.status}
@@ -408,7 +352,7 @@ export const AdminJobsMonitor: React.FC = () => {
                     <td
                       style={{
                         padding: "0.4rem 0.5rem",
-                        borderBottom: "1px solid #f3f3f3",
+                        borderBottom: "1px solid #f3f3f3"
                       }}
                     >
                       {job.type}
@@ -416,7 +360,7 @@ export const AdminJobsMonitor: React.FC = () => {
                     <td
                       style={{
                         padding: "0.4rem 0.5rem",
-                        borderBottom: "1px solid #f3f3f3",
+                        borderBottom: "1px solid #f3f3f3"
                       }}
                     >
                       {job.video_id ? (
@@ -428,23 +372,18 @@ export const AdminJobsMonitor: React.FC = () => {
                     <td
                       style={{
                         padding: "0.4rem 0.5rem",
-                        borderBottom: "1px solid #f3f3f3",
+                        borderBottom: "1px solid #f3f3f3"
                       }}
                     >
                       <div>{formatEpoch(job.started_at)}</div>
-                      <div
-                        style={{
-                          color: "#999",
-                          fontSize: "0.8rem",
-                        }}
-                      >
+                      <div style={{ color: "#999", fontSize: "0.8rem" }}>
                         → {formatEpoch(job.finished_at)}
                       </div>
                     </td>
                     <td
                       style={{
                         padding: "0.4rem 0.5rem",
-                        borderBottom: "1px solid #f3f3f3",
+                        borderBottom: "1px solid #f3f3f3"
                       }}
                     >
                       {formatDuration(job.started_at, job.finished_at)}
@@ -453,7 +392,7 @@ export const AdminJobsMonitor: React.FC = () => {
                       style={{
                         padding: "0.4rem 0.5rem",
                         borderBottom: "1px solid #f3f3f3",
-                        textAlign: "center",
+                        textAlign: "center"
                       }}
                     >
                       {job.attempts}
@@ -465,14 +404,13 @@ export const AdminJobsMonitor: React.FC = () => {
           </div>
         </div>
 
-        {/* Event stream panel */}
         <div
           style={{
             borderRadius: 12,
             border: "1px solid #ddd",
             backgroundColor: "#fff",
             display: "flex",
-            flexDirection: "column",
+            flexDirection: "column"
           }}
         >
           <div
@@ -481,7 +419,7 @@ export const AdminJobsMonitor: React.FC = () => {
               borderBottom: "1px solid #eee",
               background: "#fafafa",
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent: "space-between"
             }}
           >
             <strong>Job Event Stream</strong>
@@ -497,7 +435,7 @@ export const AdminJobsMonitor: React.FC = () => {
               padding: "0.5rem 0.75rem",
               fontFamily: "Menlo, Monaco, Consolas, monospace",
               fontSize: "0.8rem",
-              backgroundColor: "#fafafa",
+              backgroundColor: "#fafafa"
             }}
           >
             {events.length === 0 && (
@@ -511,7 +449,7 @@ export const AdminJobsMonitor: React.FC = () => {
                 style={{
                   marginBottom: "0.4rem",
                   borderBottom: "1px dashed #ececec",
-                  paddingBottom: "0.3rem",
+                  paddingBottom: "0.3rem"
                 }}
               >
                 <div style={{ color: "#555" }}>
