@@ -6,6 +6,7 @@ import useAdminPanel from "../store/useAdminPanel";
 import useAuth from "../store/useAuth";
 import { testimonials, clientLogos } from "../data/testimonials";
 import logoVariation5 from "../assets/logo-variation5.svg";
+import ContactForm from "./ContactForm";
 
 const FEATURED_SETS = [
   {
@@ -164,6 +165,8 @@ export default function Landing() {
           ))}
         </div>
       </section>
+
+      <ContactForm />
     </main>
   );
 }

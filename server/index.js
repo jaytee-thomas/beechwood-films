@@ -9,6 +9,7 @@ import { getRedisHealth } from "./lib/redis.js";
 import authRouter from "./routes/auth.js";
 import videosRouter from "./routes/videos.js";
 import { router as queueRoutes } from "./routes/queues.js";
+import contactRouter from "./routes/contact.js";
 
 console.log("[boot] commit:", process.env.RAILWAY_GIT_COMMIT_SHA || "unknown");
 // uploads can crash at import if env is missing; import defensively
@@ -77,6 +78,7 @@ app.use("/api", attachAuth);
 app.use("/api/auth", authRouter);
 app.use("/api/videos", videosRouter);
 app.use("/api", queueRoutes);
+app.use("/api", contactRouter);
 if (uploadsRouter) app.use("/api/uploads", uploadsRouter);
 
 // error handler
