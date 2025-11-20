@@ -1,45 +1,44 @@
 // src/api/queues.ts
 
 export type QueueJob = {
-  queue: string;
   job_id: string;
-  status: "queued" | "running" | "succeeded" | "failed" | string;
+  queue: string;
+  status: "queued" | "running" | "succeeded" | "failed";
   type: string;
-  video_id: number | string | null;
+  video_id?: string | null;
   attempts: number;
-  created_at: string | null;
-  started_at: string | null;
-  finished_at: string | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
 };
 
-type JobsResponse = {
-  jobs: QueueJob[];
-};
+type JobsResponse = { jobs: QueueJob[] };
 
 type RecomputeResponse = {
   jobId: string;
   mode?: string;
 };
 
-// Environment → API origin
+// ---- API base + token helpers ---------------------------------------------
+
 const API_ORIGIN =
-  (typeof window !== "undefined" && (window as any)?.VITE_API_ORIGIN) ||
-  (typeof process !== "undefined" && process.env?.VITE_API_ORIGIN) ||
+  (typeof import.meta !== "undefined" &&
+    // cast to any so TS stops complaining about .env / VITE_API_ORIGIN
+    (import.meta as any).env?.VITE_API_ORIGIN) ||
   (typeof window !== "undefined" ? window.location.origin : "");
 
 const API_BASE = `${(API_ORIGIN || "").replace(/\/$/, "")}/api/queues`;
 
 function resolveToken(explicit?: string): string | undefined {
   if (explicit) return explicit;
-
   if (typeof window === "undefined") return undefined;
 
   try {
     const raw = window.localStorage.getItem("bf-auth-v1");
     if (!raw) return undefined;
     const parsed = JSON.parse(raw);
-    const token = parsed?.state?.token;
-    return typeof token === "string" && token.length ? token : undefined;
+    // matches what we store in useAuth
+    return parsed?.state?.token ?? parsed?.token ?? undefined;
   } catch {
     return undefined;
   }
@@ -49,19 +48,26 @@ function authHeaders(token?: string): HeadersInit {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-
-  const resolved = resolveToken(token);
-  if (resolved) headers["Authorization"] = `Bearer ${resolved}`;
-
+  const t = resolveToken(token);
+  if (t) headers["Authorization"] = `Bearer ${t}`;
   return headers;
 }
 
-async function handleError(path: string, res: Response): Promise<never> {
-  const text = await res.text().catch(() => "");
+async function handleError(url: string, res: Response): Promise<never> {
+  let text = "";
+  try {
+    text = await res.text();
+  } catch {
+    // ignore
+  }
   throw new Error(
-    `Request ${path} failed: ${res.status} ${res.statusText} ${text}`,
+    `Request ${url} failed: ${res.status} ${res.statusText}${
+      text ? ` - ${text}` : ""
+    }`,
   );
 }
+
+// ---- API functions --------------------------------------------------------
 
 export async function fetchRecentJobs(token?: string): Promise<JobsResponse> {
   const url = `${API_BASE}/jobs/recent`;
@@ -70,7 +76,6 @@ export async function fetchRecentJobs(token?: string): Promise<JobsResponse> {
     credentials: "include",
     headers: authHeaders(token),
   });
-
   if (!res.ok) throw await handleError(url, res);
   return res.json();
 }
@@ -84,7 +89,6 @@ export async function recomputeAllSignals(
     credentials: "include",
     headers: authHeaders(token),
   });
-
   if (!res.ok) throw await handleError(url, res);
   return res.json();
 }
@@ -100,15 +104,13 @@ export async function recomputeSignalsForVideo(
     headers: authHeaders(token),
     body: JSON.stringify({ id: videoId }),
   });
-
   if (!res.ok) throw await handleError(url, res);
   return res.json();
 }
 
 export function createJobsEventSource(token?: string): EventSource {
+  const t = resolveToken(token);
   const url = new URL(`${API_BASE}/jobs/stream`);
-  const resolved = resolveToken(token);
-  if (resolved) url.searchParams.set("token", resolved);
-
+  if (t) url.searchParams.set("token", t);
   return new EventSource(url.toString(), { withCredentials: true });
 }
